@@ -6,15 +6,29 @@ import { speak } from '../services/speechService';
 import type { LearningContent, Question } from '../types';
 import Spinner from './Spinner';
 import { LEARNING_TOPICS } from '../constants';
-// Fix: Replaced non-existent 'CopyStack' icon with 'Layers' from lucide-react.
-import { RefreshCw, Trophy, Undo2, Check, X, Image as ImageIcon, Layers, Volume2 } from 'lucide-react';
+import { RefreshCw, Trophy, Undo2, Check, X, Image as ImageIcon, Layers, Volume2, FileText, FilePenLine, File, BookOpen, Lock } from 'lucide-react';
 import ContentRenderer from './ContentRenderer';
+
+interface Subject {
+  id: string;
+  name: string;
+  icon: string;
+  topics: Topic[];
+}
+
+interface Topic {
+  id: string;
+  name: string;
+  icon: string;
+  materials?: { id: string; name: string; type: string; url: string }[];
+}
 
 const LearningModule: React.FC = () => {
   const { userProgress, updateProgress, showNotification, selectedTopicId, setSelectedTopicId } = useAppContext();
   const { t, currentLang } = useLocalization();
-
-  const [selectedTopic, setSelectedTopic] = useState<{ id: string; name: string } | null>(null);
+  
+  const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
+  const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
   const [content, setContent] = useState<LearningContent | null>(null);
   const [quiz, setQuiz] = useState<Question[] | null>(null);
   const [currentQuizQuestion, setCurrentQuizQuestion] = useState(0);
@@ -28,6 +42,9 @@ const LearningModule: React.FC = () => {
   const [quizAnswers, setQuizAnswers] = useState<string[]>([]);
   const [isReviewingQuiz, setIsReviewingQuiz] = useState(false);
   
+  const [justCompletedTopicId, setJustCompletedTopicId] = useState<string | null>(null);
+  const [justUnlockedTopicId, setJustUnlockedTopicId] = useState<string | null>(null);
+
   // State for Image Generator
   const [isImageGeneratorOpen, setIsImageGeneratorOpen] = useState(false);
   const [imagePrompt, setImagePrompt] = useState('');
@@ -47,27 +64,23 @@ const LearningModule: React.FC = () => {
   useEffect(() => {
     // Only proceed if a topic ID is passed from another component (like Dashboard).
     if (selectedTopicId && userProgress && setSelectedTopicId) {
-      const subjectsOrTopics = LEARNING_TOPICS[userProgress.classLevel] || [];
-      const isNewStructure = subjectsOrTopics.length > 0 && subjectsOrTopics[0].hasOwnProperty('topics');
+      const subjects = LEARNING_TOPICS[userProgress.classLevel] || [];
       
-      let topicToSelect: { id: string; name: string } | null = null;
+      let subjectToSelect: Subject | null = null;
+      let topicToSelect: Topic | null = null;
       
-      if (isNewStructure) {
-        // Find the topic within the nested subject structure.
-        for (const subject of subjectsOrTopics) {
-          const foundTopic = subject.topics.find((t: any) => t.id === selectedTopicId);
-          if (foundTopic) {
-            topicToSelect = foundTopic;
-            break;
-          }
+      for (const subject of subjects) {
+        const foundTopic = subject.topics.find((t: Topic) => t.id === selectedTopicId);
+        if (foundTopic) {
+          topicToSelect = foundTopic;
+          subjectToSelect = subject;
+          break;
         }
-      } else {
-        // Fallback for old flat structure.
-        topicToSelect = subjectsOrTopics.find((t: any) => t.id === selectedTopicId);
       }
       
-      if (topicToSelect) {
-        // If the topic is found, select it. This will trigger content generation.
+      if (topicToSelect && subjectToSelect) {
+        // If the topic is found, select it and its parent subject. This will trigger content generation.
+        setSelectedSubject(subjectToSelect);
         handleTopicSelect(topicToSelect);
       }
       
@@ -81,7 +94,7 @@ const LearningModule: React.FC = () => {
     return <div>Loading user data...</div>;
   }
 
-  const handleTopicSelect = async (topic: { id: string; name: string }) => {
+  const handleTopicSelect = async (topic: Topic) => {
     setSelectedTopic(topic);
     setIsLoading(true);
     setContent(null);
@@ -96,8 +109,8 @@ const LearningModule: React.FC = () => {
       if (isTopicNew) {
           const pointsEarned = 50;
           const newPoints = userProgress.points + pointsEarned;
-          const newCompletedTopics = [...userProgress.completedTopics, topic.id];
-          updateProgress({ points: newPoints, completedTopics: newCompletedTopics });
+          // Note: we don't mark as completed here, only on quiz completion
+          updateProgress({ points: newPoints }); 
           showNotification({ message: `You earned ${pointsEarned} points for starting a new topic!`, icon: '📚' });
       }
 
@@ -159,28 +172,81 @@ const LearningModule: React.FC = () => {
   }
   
   const handleNextQuizQuestion = () => {
-      if (!quiz || !userProgress) return;
-      if (currentQuizQuestion < quiz.length - 1) {
-          setCurrentQuizQuestion(prev => prev + 1);
-          setSelectedAnswer(null);
-      } else {
-          // Finish quiz
-          setQuizFinished(true);
-          const pointsPerCorrectAnswer = 25;
-          const pointsEarned = quizScore * pointsPerCorrectAnswer;
-          updateProgress({ points: userProgress.points + pointsEarned });
-          showNotification({ message: `Quiz finished! You scored ${quizScore}/${quiz.length} and earned ${pointsEarned} points.`, icon: '📝' });
+    if (!quiz || !userProgress || !selectedTopic || !selectedSubject) return;
 
-          if (quizScore === quiz.length && !userProgress.badges.includes('quiz_whiz')) {
-              const newBadges = [...userProgress.badges, 'quiz_whiz'];
-              updateProgress({ badges: newBadges });
-              showNotification({ message: 'New Badge Unlocked: Quiz Whiz!', icon: '🏆' });
-              speak("A perfect score! You've just earned the Quiz Whiz badge. Incredible!", currentLang);
-          }
-      }
+    if (currentQuizQuestion < quiz.length - 1) {
+        setCurrentQuizQuestion(prev => prev + 1);
+        setSelectedAnswer(null);
+    } else {
+        // Finish quiz
+        setQuizFinished(true);
+        
+        const pointsPerCorrectAnswer = 25;
+        const pointsEarned = quizScore * pointsPerCorrectAnswer;
+        
+        const wasTopicCompleted = userProgress.completedTopics.includes(selectedTopic.id);
+        const hasPassed = (quizScore / quiz.length) >= 0.75;
+        
+        let updatedProgress: Partial<typeof userProgress> = {
+            points: (userProgress.points || 0) + pointsEarned
+        };
+        let newBadges = [...userProgress.badges];
+        let newCompletedTopics = [...userProgress.completedTopics];
+
+        // 1. Mark topic as completed if passed
+        if (hasPassed && !wasTopicCompleted) {
+            newCompletedTopics.push(selectedTopic.id);
+            updatedProgress.completedTopics = newCompletedTopics;
+
+            // Trigger animations
+            setJustCompletedTopicId(selectedTopic.id);
+            const currentTopicIndex = selectedSubject.topics.findIndex(t => t.id === selectedTopic.id);
+            if (currentTopicIndex !== -1 && currentTopicIndex < selectedSubject.topics.length - 1) {
+                const nextTopicId = selectedSubject.topics[currentTopicIndex + 1].id;
+                setJustUnlockedTopicId(nextTopicId);
+                // Clear animation state after it has run
+                setTimeout(() => {
+                    setJustCompletedTopicId(null);
+                    setJustUnlockedTopicId(null);
+                }, 2000);
+            }
+        }
+
+        // 2. Check for 'quiz_whiz' badge (perfect score)
+        if (quizScore === quiz.length && !newBadges.includes('quiz_whiz')) {
+            newBadges.push('quiz_whiz');
+            showNotification({ message: 'New Badge Unlocked: Quiz Whiz!', icon: '🏆' });
+            speak("A perfect score! You've just earned the Quiz Whiz badge. Incredible!", currentLang);
+        }
+        
+        // 3. Check for 'subject_champion' badge (mastered all topics)
+        if (hasPassed && !wasTopicCompleted) {
+            const allTopicsInSubject = selectedSubject.topics.map((t: Topic) => t.id);
+            const allTopicsCompleted = allTopicsInSubject.every((topicId: string) => newCompletedTopics.includes(topicId));
+
+            if (allTopicsCompleted && !newBadges.includes('subject_champion')) {
+                newBadges.push('subject_champion');
+                showNotification({ message: `New Badge Unlocked: ${selectedSubject.name} Champion!`, icon: '🏅' });
+                speak(`You have mastered all topics in ${selectedSubject.name}. You are a true subject champion!`, currentLang);
+            }
+        }
+
+        // 4. Consolidate badge updates if any were added
+        if (newBadges.length > userProgress.badges.length) {
+            updatedProgress.badges = newBadges;
+        }
+
+        // 5. Apply all progress updates at once
+        if (Object.keys(updatedProgress).length > 1 || updatedProgress.points !== userProgress.points) {
+            updateProgress(updatedProgress);
+        }
+
+        showNotification({ message: `Quiz finished! You scored ${quizScore}/${quiz.length} and earned ${pointsEarned} points.`, icon: '📝' });
+    }
   }
 
   const resetModule = () => {
+      setSelectedSubject(null);
       setSelectedTopic(null);
       setContent(null);
       setQuiz(null);
@@ -192,6 +258,15 @@ const LearningModule: React.FC = () => {
       setFlashcards(null);
       setFlashcardGenerationError(null);
       setFlippedFlashcardIndex(null);
+  }
+
+  const backToPath = () => {
+      setSelectedTopic(null);
+      setContent(null);
+      setQuiz(null);
+      setError(null);
+      setIsImageGeneratorOpen(false);
+      resetImageGenerator();
   }
   
   const handleGenerateImage = async () => {
@@ -240,67 +315,105 @@ const LearningModule: React.FC = () => {
     }
   };
 
-  const renderTopicSelection = () => {
-    const subjectsOrTopics = LEARNING_TOPICS[userProgress.classLevel] || [];
-    const isNewStructure = subjectsOrTopics.length > 0 && subjectsOrTopics[0].hasOwnProperty('topics');
+  const renderSubjectSelection = () => {
+    const subjects = LEARNING_TOPICS[userProgress.classLevel] || [];
 
     return (
       <div className="max-w-4xl mx-auto animate-fade-in">
         <div className="text-center">
           <h2 className="text-3xl font-bold">{t('learning_zone')}</h2>
-          <p className="text-slate-500 mt-2">Select a topic to start learning and earn points.</p>
+          <p className="text-slate-500 mt-2">Select a subject to begin your learning path.</p>
         </div>
+        
+        <div className="mt-10 grid md:grid-cols-3 gap-6">
+          {subjects.map((subject: Subject) => (
+            <button
+              key={subject.id}
+              onClick={() => setSelectedSubject(subject)}
+              disabled={isLoading}
+              className="flex flex-col items-center justify-center p-6 bg-white dark:bg-slate-800 rounded-lg shadow-md interactive-card hover:bg-indigo-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span className="text-5xl mb-3">{subject.icon}</span>
+              <h3 className="font-semibold text-lg text-center">{subject.name}</h3>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
   
-        {isNewStructure ? (
-          subjectsOrTopics.map((subject: any) => (
-            <div key={subject.id} className="mt-10">
-              <h3 className="text-2xl font-bold flex items-center gap-3 text-slate-700 dark:text-slate-200">
-                <span className="text-3xl">{subject.icon}</span>
-                {subject.name}
-              </h3>
-              {subject.topics.length > 0 ? (
-                <div className="mt-6 grid md:grid-cols-3 gap-6">
-                  {subject.topics.map((topic: any) => (
-                    <button
-                      key={topic.id}
-                      onClick={() => handleTopicSelect(topic)}
-                      disabled={isLoading}
-                      className="flex flex-col items-center justify-center p-6 bg-white dark:bg-slate-800 rounded-lg shadow-md interactive-card hover:bg-indigo-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <span className="text-5xl mb-3">{topic.icon}</span>
-                      <h3 className="font-semibold text-lg text-center">{topic.name}</h3>
-                      {userProgress.completedTopics.includes(topic.id) && (
-                        <span className="text-xs text-green-500 font-bold mt-2">COMPLETED</span>
-                      )}
-                    </button>
-                  ))}
+  const renderLearningPath = () => {
+    if (!selectedSubject) return null;
+
+    return (
+      <div className="max-w-2xl mx-auto animate-fade-in">
+        <button onClick={() => setSelectedSubject(null)} className="flex items-center gap-2 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline mb-6">
+            <Undo2 className="h-4 w-4" /> Back to Subjects
+        </button>
+        <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold flex items-center justify-center gap-3">
+                <span className="text-4xl">{selectedSubject.icon}</span>
+                {selectedSubject.name}
+            </h2>
+            <p className="text-slate-500 mt-2">Complete topics in order to unlock the next one.</p>
+        </div>
+
+        <div className="path-container">
+          {selectedSubject.topics.map((topic, index) => {
+            let status: 'completed' | 'unlocked' | 'locked' = 'locked';
+            const isCompleted = userProgress.completedTopics.includes(topic.id);
+            const isFirstTopic = index === 0;
+            const previousTopicCompleted = index > 0 && userProgress.completedTopics.includes(selectedSubject.topics[index - 1].id);
+
+            if (isCompleted) {
+              status = 'completed';
+            } else if (isFirstTopic || previousTopicCompleted) {
+              status = 'unlocked';
+            }
+            
+            const statusStyles = {
+              completed: {
+                icon: <Check className="h-5 w-5" />,
+                iconClass: 'path-icon-completed',
+                cardClass: 'border-green-500 bg-green-50 dark:bg-green-900/20'
+              },
+              unlocked: {
+                icon: <BookOpen className="h-5 w-5" />,
+                iconClass: 'path-icon-unlocked',
+                cardClass: 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 interactive-card cursor-pointer'
+              },
+              locked: {
+                icon: <Lock className="h-5 w-5" />,
+                iconClass: 'path-icon-locked',
+                cardClass: 'border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 opacity-70 cursor-not-allowed'
+              }
+            };
+            
+            const currentStyle = statusStyles[status];
+            const isJustUnlocked = topic.id === justUnlockedTopicId;
+
+            return (
+              <div key={topic.id} className="path-node">
+                <div className={`path-icon ${currentStyle.iconClass}`}>
+                  {currentStyle.icon}
                 </div>
-              ) : (
-                <div className="mt-4 text-center text-slate-500 dark:text-slate-400 p-6 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                  <p>Topics for this subject are coming soon!</p>
-                </div>
-              )}
-            </div>
-          ))
-        ) : (
-          // Fallback for old structure
-          <div className="mt-8 grid md:grid-cols-3 gap-6">
-            {subjectsOrTopics.map((topic: any) => (
-              <button
-                key={topic.id}
-                onClick={() => handleTopicSelect(topic)}
-                disabled={isLoading}
-                className="flex flex-col items-center justify-center p-6 bg-white dark:bg-slate-800 rounded-lg shadow-md interactive-card hover:bg-indigo-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <span className="text-5xl mb-3">{topic.icon}</span>
-                <h3 className="font-semibold text-lg text-center">{topic.name}</h3>
-                {userProgress.completedTopics.includes(topic.id) && (
-                  <span className="text-xs text-green-500 font-bold mt-2">COMPLETED</span>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
+                <button
+                  onClick={() => status === 'unlocked' && handleTopicSelect(topic)}
+                  disabled={status === 'locked'}
+                  className={`w-full text-left p-4 rounded-lg border-2 shadow-sm transition-all ${currentStyle.cardClass} ${isJustUnlocked ? 'animate-unlock' : ''}`}
+                >
+                    <div className="flex items-center gap-4">
+                        <span className="text-3xl">{topic.icon}</span>
+                        <div>
+                            <h4 className="font-bold text-slate-800 dark:text-slate-100">{topic.name}</h4>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 capitalize">{status}</p>
+                        </div>
+                    </div>
+                </button>
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
   };
@@ -413,6 +526,49 @@ const LearningModule: React.FC = () => {
                     </div>
                 </>
             )}
+        </div>
+    );
+  };
+
+  const renderStudyMaterials = () => {
+    if (!selectedTopic?.materials || selectedTopic.materials.length === 0) {
+        return null;
+    }
+
+    const getIconForType = (type: string) => {
+        switch (type.toLowerCase()) {
+            case 'pdf':
+                return <FileText className="h-8 w-8 text-red-500 flex-shrink-0" />;
+            case 'worksheet':
+                return <FilePenLine className="h-8 w-8 text-blue-500 flex-shrink-0" />;
+            default:
+                return <File className="h-8 w-8 text-slate-500 flex-shrink-0" />;
+        }
+    };
+
+    return (
+        <div className="mt-8 p-6 bg-slate-50 dark:bg-slate-700/50 rounded-lg animate-fade-in border border-slate-200 dark:border-slate-600">
+            <h3 className="text-xl font-bold text-slate-700 dark:text-slate-200 mb-4">Study Materials</h3>
+            <div className="space-y-3">
+                {selectedTopic.materials.map(material => (
+                    <div key={material.id} className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700">
+                        <div className="flex items-center gap-4 min-w-0">
+                            {getIconForType(material.type)}
+                            <div className="min-w-0">
+                                <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">{material.name}</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">{material.type}</p>
+                            </div>
+                        </div>
+                        <a
+                            href={material.url}
+                            download
+                            className="ml-4 px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex-shrink-0"
+                        >
+                            Download
+                        </a>
+                    </div>
+                ))}
+            </div>
         </div>
     );
   };
@@ -531,8 +687,8 @@ const LearningModule: React.FC = () => {
 
   const renderContent = () => (
     <div className="max-w-4xl mx-auto bg-white dark:bg-slate-800 rounded-lg shadow-xl p-8 animate-slide-in-up">
-        <button onClick={resetModule} className="flex items-center gap-2 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline mb-4">
-            <Undo2 className="h-4 w-4" /> Back to Topics
+        <button onClick={backToPath} className="flex items-center gap-2 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline mb-4">
+            <Undo2 className="h-4 w-4" /> Back to Learning Path
         </button>
         <div className="flex justify-between items-center mb-2">
             <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-100">{selectedTopic?.name}</h2>
@@ -564,6 +720,8 @@ const LearningModule: React.FC = () => {
                     <ContentRenderer content={content.content} />
                 </div>
                 
+                {renderStudyMaterials()}
+
                 <div className="mt-8 text-center border-t border-slate-200 dark:border-slate-700 pt-6 flex flex-wrap justify-center gap-4">
                     {!quiz && (
                          <button onClick={startQuiz} disabled={isLoading || isRegenerating} className="px-8 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow disabled:bg-slate-400 hover:bg-indigo-700 flex items-center justify-center">
@@ -600,7 +758,9 @@ const LearningModule: React.FC = () => {
     </div>
   );
 
-  return selectedTopic ? renderContent() : renderTopicSelection();
+  if (selectedTopic) return renderContent();
+  if (selectedSubject) return renderLearningPath();
+  return renderSubjectSelection();
 };
 
 export default LearningModule;

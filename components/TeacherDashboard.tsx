@@ -3,8 +3,9 @@ import React, { useState } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { useLocalization } from '../hooks/useLocalization';
 import { MOCKED_STUDENTS } from '../constants';
-import { generateStudySuggestions } from '../services/geminiService';
+import { generateStudyPlan } from '../services/geminiService';
 import Spinner from './Spinner';
+import ContentRenderer from './ContentRenderer';
 
 type Student = typeof MOCKED_STUDENTS[0];
 
@@ -13,23 +14,23 @@ const TeacherDashboard: React.FC = () => {
     const { t } = useLocalization();
 
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-    const [suggestions, setSuggestions] = useState<string | null>(null);
+    const [studyPlan, setStudyPlan] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const students = MOCKED_STUDENTS;
 
-    const handleGetSuggestions = async (student: Student) => {
+    const handleGetStudyPlan = async (student: Student) => {
         setSelectedStudent(student);
         setIsLoading(true);
         setError(null);
-        setSuggestions(null);
+        setStudyPlan(null);
         try {
-            const result = await generateStudySuggestions(student.name, student.weaknesses, student.strengths, 'teacher');
-            setSuggestions(result);
+            const result = await generateStudyPlan(student.name, student.weaknesses, student.strengths, 'teacher');
+            setStudyPlan(result);
         } catch (e) {
-            console.error("Failed to get suggestions", e);
-            setError("Failed to generate suggestions. Please try again.");
+            console.error("Failed to get study plan", e);
+            setError("Failed to generate study plan. Please try again.");
         } finally {
             setIsLoading(false);
         }
@@ -77,8 +78,8 @@ const TeacherDashboard: React.FC = () => {
                                     <td className="px-6 py-4">{student.points}</td>
                                     <td className="px-6 py-4">{student.lastActivity}</td>
                                     <td className="px-6 py-4">
-                                        <button onClick={() => handleGetSuggestions(student)} className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
-                                            Get Suggestions
+                                        <button onClick={() => handleGetStudyPlan(student)} className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
+                                            Generate Study Plan
                                         </button>
                                     </td>
                                 </tr>
@@ -91,20 +92,20 @@ const TeacherDashboard: React.FC = () => {
                 <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center animate-fade-in" onClick={closeModal}>
                     <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-lg m-4" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">Suggestions for {selectedStudent.name}</h3>
+                            <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">Study Plan for {selectedStudent.name}</h3>
                             <button onClick={closeModal} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-full p-1 focus:outline-none focus:ring-2 focus:ring-slate-400" aria-label="Close modal">
                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
                         </div>
-                        <div>
+                        <div className="max-h-[60vh] overflow-y-auto pr-2">
                             {isLoading ? (
-                                <Spinner text="Generating suggestions..." />
+                                <Spinner text="Generating study plan..." />
                             ) : error ? (
                                 <p className="text-red-500">{error}</p>
                             ) : (
-                                <div className="text-slate-600 dark:text-slate-300 whitespace-pre-wrap font-sans">{suggestions}</div>
+                                studyPlan && <ContentRenderer content={studyPlan} />
                             )}
                         </div>
                     </div>

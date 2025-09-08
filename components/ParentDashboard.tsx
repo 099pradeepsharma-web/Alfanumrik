@@ -4,8 +4,9 @@ import { useAppContext } from '../contexts/AppContext';
 import { useLocalization } from '../hooks/useLocalization';
 import { MOCKED_CHILDREN } from '../constants';
 import ProgressBar from './ProgressBar';
-import { generateStudySuggestions } from '../services/geminiService';
+import { generateStudyPlan } from '../services/geminiService';
 import Spinner from './Spinner';
+import ContentRenderer from './ContentRenderer';
 
 type Child = typeof MOCKED_CHILDREN[0];
 
@@ -13,21 +14,21 @@ const ParentDashboard: React.FC = () => {
     const { currentUser } = useAppContext();
     const { t } = useLocalization();
     
-    const [suggestions, setSuggestions] = useState<{ [key: string]: string }>({});
+    const [studyPlans, setStudyPlans] = useState<{ [key: string]: string }>({});
     const [isLoading, setIsLoading] = useState<{ [key: string]: boolean }>({});
     const [error, setError] = useState<{ [key: string]: string | null }>({});
     
     const children = MOCKED_CHILDREN;
 
-    const handleGetSuggestions = async (child: Child) => {
+    const handleGetStudyPlan = async (child: Child) => {
         setIsLoading(prev => ({ ...prev, [child.id]: true }));
         setError(prev => ({ ...prev, [child.id]: null }));
         try {
-            const result = await generateStudySuggestions(child.name, child.weaknesses, child.strengths, 'parent');
-            setSuggestions(prev => ({ ...prev, [child.id]: result }));
+            const result = await generateStudyPlan(child.name, child.weaknesses, child.strengths, 'parent');
+            setStudyPlans(prev => ({ ...prev, [child.id]: result }));
         } catch (e) {
-            console.error("Failed to get suggestions", e);
-            setError(prev => ({ ...prev, [child.id]: 'Could not generate suggestions. Please try again later.' }));
+            console.error("Failed to get study plan", e);
+            setError(prev => ({ ...prev, [child.id]: 'Could not generate study plan. Please try again later.' }));
         } finally {
             setIsLoading(prev => ({ ...prev, [child.id]: false }));
         }
@@ -73,20 +74,20 @@ const ParentDashboard: React.FC = () => {
                         </div>
 
                         <div className="mt-6 border-t border-slate-200 dark:border-slate-700 pt-4">
-                            <h4 className="font-semibold text-slate-600 dark:text-slate-300 mb-3 text-sm">Personalized Advice</h4>
+                            <h4 className="font-semibold text-slate-600 dark:text-slate-300 mb-3 text-sm">Personalized Study Plan</h4>
                             {isLoading[child.id] ? (
-                                <div className="flex justify-center"><Spinner text="Generating advice..." /></div>
+                                <div className="flex justify-center"><Spinner text="Generating plan..." /></div>
                             ) : error[child.id] ? (
                                 <p className="text-red-500 text-sm p-2 bg-red-50 dark:bg-red-900/20 rounded">{error[child.id]}</p>
-                            ) : suggestions[child.id] ? (
-                                <div className="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg font-sans">{suggestions[child.id]}</div>
+                            ) : studyPlans[child.id] ? (
+                                <ContentRenderer content={studyPlans[child.id]} />
                             ) : (
                                 <button
-                                    onClick={() => handleGetSuggestions(child)}
+                                    onClick={() => handleGetStudyPlan(child)}
                                     className="w-full px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-slate-400"
                                     disabled={isLoading[child.id]}
                                 >
-                                    Get AI Study Suggestions
+                                    Generate AI Study Plan
                                 </button>
                             )}
                         </div>

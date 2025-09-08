@@ -21,6 +21,11 @@ export const BADGES: { [id: string]: BadgeInfo } = {
     description: 'Scored 90% or higher on an exam.',
     icon: '🏆',
   },
+  'subject_champion': {
+    name: 'Subject Champion',
+    description: 'Mastered all topics in a subject.',
+    icon: '🏅',
+  },
 };
 
 export const CLASS_LEVELS = ['6', '7', '8', '9', '10', '11', '12'];
@@ -32,8 +37,23 @@ export const LEARNING_TOPICS: { [classLevel: string]: any[] } = {
       name: 'Mathematics',
       icon: '🧮',
       topics: [
-        { id: 'fractions_6', name: 'Introduction to Fractions', icon: '➗' },
-        { id: 'decimals_6', name: 'Understanding Decimals', icon: '🔢' },
+        { 
+          id: 'fractions_6', 
+          name: 'Introduction to Fractions', 
+          icon: '➗',
+          materials: [
+            { id: 'frac_notes_1', name: 'Fractions Explained (PDF)', type: 'PDF', url: '#' },
+            { id: 'frac_ws_1', name: 'Practice Worksheet 1', type: 'Worksheet', url: '#' }
+          ]
+        },
+        { 
+          id: 'decimals_6', 
+          name: 'Understanding Decimals', 
+          icon: '🔢',
+          materials: [
+            { id: 'dec_notes_1', name: 'Decimal Points Guide', type: 'PDF', url: '#' }
+          ]
+        },
         { id: 'geometry_basics_6', name: 'Basic Geometric Ideas', icon: '📐' },
       ],
     },
@@ -43,7 +63,14 @@ export const LEARNING_TOPICS: { [classLevel: string]: any[] } = {
       icon: '🔬',
       topics: [
         { id: 'solar_system_6', name: 'The Solar System', icon: '🪐' },
-        { id: 'living_organisms_6', name: 'Living Organisms & Surroundings', icon: '🦋' },
+        { 
+          id: 'living_organisms_6', 
+          name: 'Living Organisms & Surroundings', 
+          icon: '🦋',
+          materials: [
+            { id: 'lo_notes_1', name: 'Habitats and Adaptations', type: 'PDF', url: '#' }
+          ]
+        },
         { id: 'food_components_6', name: 'Components of Food', icon: '🍎' },
       ],
     },

@@ -15,7 +15,11 @@ Generate a concise and engaging learning module on the topic "${topicName}" spec
 
 Your explanation must be:
 1.  **CBSE-Aligned**: Strictly adhere to the key concepts and depth expected for Class ${classLevel} in the CBSE pattern.
-2.  **Easy to Understand**: Use simple language, analogies, and real-world examples that a student in India can relate to. Break down complex ideas into bullet points or numbered lists for clarity.
+2.  **Easy to Understand**: Use simple language, analogies, and real-world examples that a student in India can relate to. Use markdown for structure:
+    - Use \`###\` for main section headings.
+    - Use \`####\` for sub-headings.
+    - Use \`**bold text**\` for key terms.
+    - Use bulleted (\`*\`) or numbered (\`1.\`) lists for clarity.
 3.  **Visually Rich**: Incorporate clear and helpful text-based diagrams (ASCII art) to illustrate important concepts. For example, for a biology topic, you could draw a simple cell. For a physics topic, a force diagram.
 
 Example of a text-based diagram for the water cycle:
@@ -121,22 +125,29 @@ export async function generateImageFromPrompt(prompt: string): Promise<string> {
     throw new Error("Image generation failed or returned no images.");
 }
 
-export async function generateStudySuggestions(studentName: string, weaknesses: string[], strengths: string[], targetAudience: 'parent' | 'teacher'): Promise<string> {
+export async function generateStudyPlan(studentName: string, weaknesses: string[], strengths: string[], targetAudience: 'parent' | 'teacher'): Promise<string> {
     const prompt = `
-        You are an expert educator providing helpful, concise, and encouraging advice.
-        Generate personalized study suggestions for a student named ${studentName}.
-        This advice is for their ${targetAudience}.
+        You are an expert AI academic advisor creating a personalized mini study plan for a K-12 student in India.
+        The plan is for the student's ${targetAudience} to review.
+        The student's name is ${studentName}.
 
-        Student's profile:
-        - Main area(s) of weakness: ${weaknesses.join(', ')}
-        - Area(s) of strength: ${strengths.join(', ')}
+        Student's Academic Profile:
+        - Strengths: ${strengths.join(', ')}
+        - Weaknesses: ${weaknesses.join(', ')}
 
-        Please provide:
-        1. A brief, encouraging opening.
-        2. 2-3 specific, actionable suggestions to help with their weak areas. These could include specific topics to review or simple practice exercises.
-        3. A concluding positive remark.
+        Your task is to create a clear, actionable, and encouraging 3-step study plan to help ${studentName} improve in their weak areas while leveraging their strengths.
 
-        Format the response as a short paragraph followed by a bulleted or numbered list for the suggestions.
+        The plan should have the following structure and be formatted with markdown for headings:
+        1.  **Encouraging Opener:** Start with a brief, positive opening that acknowledges ${studentName}'s strengths. Use **bold text** for emphasis.
+        2.  **3-Step Study Plan:** Provide three distinct, actionable steps. For each step:
+            - Use a markdown heading like "### Step 1: Revisit the Basics".
+            - Suggest a specific topic to review or a type of practice exercise.
+            - Briefly explain *why* this step is important.
+            - Make it sound achievable and not overwhelming.
+        3.  **Positive Conclusion:** End with a motivational sentence to encourage both the student and the ${targetAudience}.
+
+        The tone should be supportive and tailored for a ${targetAudience} in India.
+        Example suggestion for a weak area like 'Algebraic Equations': "Start with a 15-minute review of 'Solving for x' in linear equations. This will build a strong foundation before moving to more complex problems."
     `;
 
     const response = await ai.models.generateContent({

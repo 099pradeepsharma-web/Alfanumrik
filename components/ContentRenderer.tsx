@@ -7,8 +7,18 @@ interface ContentRendererProps {
 const ContentRenderer: React.FC<ContentRendererProps> = ({ content }) => {
     const lines = content.split('\n');
     const elements: ReactNode[] = [];
-    let currentList: { type: 'ul' | 'ol'; items: string[] } | null = null;
+    let currentList: { type: 'ul' | 'ol'; items: ReactNode[] } | null = null;
     let currentDiagram: string[] | null = null;
+
+    const renderTextWithBold = (text: string): ReactNode => {
+        const parts = text.split(/(\*\*.*?\*\*)/g);
+        return parts.map((part, i) => {
+            if (part.startsWith('**') && part.endsWith('**')) {
+                return <strong key={i}>{part.slice(2, -2)}</strong>;
+            }
+            return part;
+        });
+    };
 
     const flushList = () => {
         if (currentList) {
@@ -51,20 +61,34 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({ content }) => {
     let isPotentiallyInDiagram = false;
 
     lines.forEach((line) => {
+        const h3Match = line.match(/^###\s+(.*)/);
+        const h4Match = line.match(/^####\s+(.*)/);
         const unorderedMatch = line.match(/^\s*[-*]\s+(.*)/);
         const orderedMatch = line.match(/^\s*\d+\.\s+(.*)/);
 
-        if (unorderedMatch) {
+        const flushAll = () => {
+            flushList();
+            flushDiagram();
+            isPotentiallyInDiagram = false;
+        };
+        
+        if (h3Match) {
+            flushAll();
+            elements.push(<h3 key={`h3-${elements.length}`} className="text-xl font-bold mt-6 mb-2 text-slate-700 dark:text-slate-200">{renderTextWithBold(h3Match[1])}</h3>);
+        } else if (h4Match) {
+            flushAll();
+            elements.push(<h4 key={`h4-${elements.length}`} className="text-lg font-semibold mt-5 mb-2 text-slate-700 dark:text-slate-200">{renderTextWithBold(h4Match[1])}</h4>);
+        } else if (unorderedMatch) {
             flushDiagram();
             if (currentList?.type !== 'ul') flushList();
             if (!currentList) currentList = { type: 'ul', items: [] };
-            currentList.items.push(unorderedMatch[1]);
+            currentList.items.push(renderTextWithBold(unorderedMatch[1]));
             isPotentiallyInDiagram = false;
         } else if (orderedMatch) {
             flushDiagram();
             if (currentList?.type !== 'ol') flushList();
             if (!currentList) currentList = { type: 'ol', items: [] };
-            currentList.items.push(orderedMatch[1]);
+            currentList.items.push(renderTextWithBold(orderedMatch[1]));
             isPotentiallyInDiagram = false;
         } else if (isDiagramLine(line) || (isPotentiallyInDiagram && line.trim().length > 0) ) {
             flushList();
@@ -72,15 +96,9 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({ content }) => {
             currentDiagram.push(line);
             isPotentiallyInDiagram = true;
         } else {
-            flushList();
-            flushDiagram();
-            isPotentiallyInDiagram = false;
+            flushAll();
             if (line.trim().length > 0) {
-                 if (line.length < 80 && /:$/.test(line.trim()) && !line.includes('e.g.')) {
-                     elements.push(<h4 key={`heading-${elements.length}`} className="text-lg font-semibold mt-6 mb-2 text-slate-700 dark:text-slate-200">{line}</h4>);
-                 } else {
-                     elements.push(<p key={`p-${elements.length}`} className="my-4 leading-relaxed">{line}</p>);
-                 }
+                 elements.push(<p key={`p-${elements.length}`} className="my-4 leading-relaxed">{renderTextWithBold(line)}</p>);
             }
         }
     });
