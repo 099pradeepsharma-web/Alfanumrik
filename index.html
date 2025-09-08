@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AlfaNumric</title>
+    <script>
+      // This polyfill makes the API key available to the application
+      // in a way that mimics a Node.js environment variable, which the
+      // @google/genai SDK expects.
+      if (!window.process) {
+        window.process = {
+          env: {
+            API_KEY: "AIzaSyDezSOh-MZmUSBwYcfWu50Tc0aEuwNxD_o"
+          }
+        };
+      }
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      @keyframes fade-in {
+        from { opacity: 0; transform: scale(0.98); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      .animate-fade-in {
+        animation: fade-in 0.4s ease-out forwards;
+      }
+
+      @keyframes fade-in-right {
+        from { opacity: 0; transform: translateX(20px); }
+        to { opacity: 1; transform: translateX(0); }
+      }
+      .animate-fade-in-right {
+        animation: fade-in-right 0.5s cubic-bezier(0.215, 0.610, 0.355, 1.000) forwards;
+      }
+
+      @keyframes slide-in-up {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-slide-in-up {
+        animation: slide-in-up 0.5s cubic-bezier(0.215, 0.610, 0.355, 1.000) forwards;
+      }
+      
+      /* Base transition for interactive cards */
+      .interactive-card {
+        transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+      }
+      .interactive-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+      }
+
+      /* Learning Path Styles */
+      .path-container {
+        position: relative;
+      }
+      /* The main vertical line for the entire path */
+      .path-container::before {
+        content: '';
+        position: absolute;
+        top: 20px;
+        bottom: 20px;
+        left: 36px;
+        width: 4px;
+        background-color: #e2e8f0; /* slate-200 */
+        border-radius: 2px;
+      }
+      .dark .path-container::before {
+        background-color: #475569; /* slate-600 */
+      }
+      .path-node {
+        position: relative;
+        padding-left: 80px; /* Space for icon and line */
+        margin-bottom: 1rem;
+      }
+      .path-node:last-child {
+        margin-bottom: 0;
+      }
+      .path-icon {
+        position: absolute;
+        left: 16px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 40px;
+        height: 40px;
+        border-radius: 9999px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 4px solid #e2e8f0; /* slate-200 */
+        transition: all 0.3s ease;
+      }
+      .dark .path-icon {
+        border-color: #475569; /* slate-600 */
+      }
+      /* Status-specific styles */
+      .path-icon-completed {
+        background-color: #16a34a; /* green-600 */
+        border-color: #dcfce7; /* green-100 */
+        color: white;
+      }
+      .dark .path-icon-completed {
+        border-color: #14532d; /* green-900 */
+      }
+      .path-icon-unlocked {
+        background-color: #4f46e5; /* indigo-600 */
+        border-color: #e0e7ff; /* indigo-100 */
+        color: white;
+      }
+      .dark .path-icon-unlocked {
+        border-color: #3730a3; /* indigo-800 */
+      }
+      .path-icon-locked {
+        background-color: #94a3b8; /* slate-400 */
+        border-color: #e2e8f0; /* slate-200 */
+        color: #f1f5f9; /* slate-100 */
+      }
+      .dark .path-icon-locked {
+        background-color: #64748b; /* slate-500 */
+        border-color: #475569; /* slate-600 */
+      }
+
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.17.0",
+    "react/": "https://aistudiocdn.com/react@^19.1.1/",
+    "react": "https://aistudiocdn.com/react@^19.1.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
+    "firebase/app": "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js",
+    "firebase/auth": "https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js",
+    "firebase/firestore": "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js",
+    "firebase/": "https://aistudiocdn.com/firebase@^12.2.1/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.542.0"
+  }
+}
+</script>
+</head>
+  <body class="bg-slate-50 dark:bg-slate-900">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

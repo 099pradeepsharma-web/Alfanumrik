@@ -1,0 +1,8 @@
+{
+  "name": "AlfaNumric",
+  "description": "An adaptive, gamified learning portal for K-12 CBSE students, infused with the HOOK model to boost engagement. Features an Exam Mode for question preparation and writing practice, with multilingual support.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
