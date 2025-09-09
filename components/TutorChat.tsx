@@ -47,18 +47,56 @@ const TutorChat: React.FC<TutorChatProps> = ({ onClose }) => {
         e?.preventDefault();
         const messageText = textOverride || input;
         if (!messageText.trim() || isLoading || !chatRef.current) return;
-
+    
         const userMessage: Message = { sender: 'user', text: messageText };
         setMessages(prev => [...prev, userMessage]);
         setInput('');
         setIsLoading(true);
-
+    
         try {
-            const response = await chatRef.current.sendMessage({ message: messageText });
+            let response;
+            // Check if camera is on and video element is ready to capture a frame
+            if (isCameraOn && videoRef.current && videoRef.current.readyState >= 2) {
+                const canvas = document.createElement('canvas');
+                const video = videoRef.current;
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                
+                if (ctx) {
+                    // Flip the canvas horizontally to match the mirrored video feed the user sees
+                    ctx.translate(canvas.width, 0);
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    
+                    // Get base64 data, remove the 'data:image/jpeg;base64,' prefix
+                    const base64Data = canvas.toDataURL('image/jpeg').split(',')[1];
+    
+                    const imagePart = {
+                        inlineData: {
+                            mimeType: 'image/jpeg',
+                            data: base64Data,
+                        },
+                    };
+                    const textPart = { text: messageText };
+    
+                    // Send message with both text and image parts
+                    // Fix: The sendMessage method expects an object with a 'message' property,
+                    // which can be a string or an array of parts.
+                    response = await chatRef.current.sendMessage({ message: [textPart, imagePart] });
+                } else {
+                    // Fallback to text-only if canvas fails
+                    response = await chatRef.current.sendMessage({ message: messageText });
+                }
+            } else {
+                // Default text-only message if camera is off or not ready
+                response = await chatRef.current.sendMessage({ message: messageText });
+            }
+    
             const tutorMessage: Message = { sender: 'tutor', text: response.text };
             setMessages(prev => [...prev, tutorMessage]);
-            if (textOverride) { // Speak only if input came from voice recognition
-                 speak(response.text, currentLang);
+            if (textOverride) {
+                speak(response.text, currentLang);
             }
         } catch (error) {
             console.error("Failed to send message:", error);
@@ -133,7 +171,8 @@ const TutorChat: React.FC<TutorChatProps> = ({ onClose }) => {
                 - Use Indian English phrasing where natural and appropriate (e.g., use "lakhs" and "crores" for large numbers).
                 - After explaining a concept, ask a follow-up question to check for understanding.
                 - If a student is wrong, gently correct them and explain the misconception.
-                - Keep your responses concise and focused.`,
+                - Keep your responses concise and focused.
+                - You may also receive images from the student's camera along with their text. If you see an image, use it as context. For example, if they show you a math problem in their notebook, help them solve it. If they look confused, be extra encouraging. Keep your analysis of the user and their environment strictly professional and focused on educational assistance.`,
             },
         });
         

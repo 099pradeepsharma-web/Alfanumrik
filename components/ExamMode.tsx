@@ -2,17 +2,52 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { useLocalization } from '../hooks/useLocalization';
-import { generateQuiz, generateEssayPrompt, provideEssayFeedback } from '../services/geminiService';
+import { generateQuiz, generateEssayPrompt, provideEssayFeedback, generateSummary } from '../services/geminiService';
 import { speak } from '../services/speechService';
 import type { Question } from '../types';
 import Spinner from './Spinner';
 import ProgressBar from './ProgressBar';
 import TutorChat from './TutorChat';
 import ContentRenderer from './ContentRenderer';
-import { MessageSquareHeart, Edit, FileText } from 'lucide-react';
+import { MessageSquareHeart, Edit, FileText, X, BookCopy } from 'lucide-react';
 
 const EXAM_TOPICS = ['Mathematics', 'Science', 'Social Studies', 'English', 'Hindi', 'Computer Science', 'General Knowledge'];
 const QUESTIONS_PER_EXAM = 5;
+
+const SummaryModal: React.FC<{
+  onClose: () => void;
+  summary: string | null;
+  isLoading: boolean;
+  error: string | null;
+  title: string;
+}> = ({ onClose, summary, isLoading, error, title }) => {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center animate-fade-in" onClick={onClose}>
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-lg m-4 animate-slide-in-up" onClick={(e) => e.stopPropagation()}>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">{title}</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-full p-1 focus:outline-none focus:ring-2 focus:ring-slate-400 btn-pressable" aria-label="Close modal">
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+        <div className="max-h-[60vh] overflow-y-auto pr-2">
+          {isLoading ? (
+            <div className="flex justify-center p-8">
+              <Spinner text="Generating summary..." />
+            </div>
+          ) : error ? (
+            <p className="text-red-500 text-center">{error}</p>
+          ) : summary ? (
+            <ContentRenderer content={summary} />
+          ) : (
+            <p className="text-slate-500 text-center">No summary available.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 const ExamMode: React.FC = () => {
   const { userProgress, updateProgress, showNotification } = useAppContext();
@@ -38,6 +73,12 @@ const ExamMode: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isTutorChatOpen, setIsTutorChatOpen] = useState(false);
+
+  // New state for summary
+  const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
+  const [summaryText, setSummaryText] = useState<string | null>(null);
+  const [isSummaryLoading, setIsSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
 
   const startQuiz = async (selectedTopic: string) => {
     setTopic(selectedTopic);
@@ -95,6 +136,23 @@ const ExamMode: React.FC = () => {
     }
   };
 
+  const handleGenerateSummary = async (contentToSummarize: string) => {
+    if (!contentToSummarize || !userProgress) return;
+    setIsSummaryModalOpen(true);
+    setSummaryText(null);
+    setSummaryError(null);
+    setIsSummaryLoading(true);
+
+    try {
+        const summary = await generateSummary(contentToSummarize, userProgress.classLevel);
+        setSummaryText(summary);
+    } catch (e: any) {
+        setSummaryError(e.message || "Failed to generate summary.");
+    } finally {
+        setIsSummaryLoading(false);
+    }
+  };
+
   const handleAnswerSelect = (answer: string) => {
     setSelectedAnswer(answer);
     if (answer === questions[currentQuestionIndex].correctAnswer) {
@@ -137,6 +195,8 @@ const ExamMode: React.FC = () => {
     setEssayText('');
     setFeedback(null);
     setError(null);
+    setIsSummaryModalOpen(false);
+    setSummaryText(null);
   };
   
   const renderSelectionScreen = () => (
@@ -304,7 +364,16 @@ const ExamMode: React.FC = () => {
             
             {feedback && (
                 <div className="mt-6 border-t border-slate-200 dark:border-slate-700 pt-6 animate-fade-in">
-                    <h3 className="text-2xl font-bold mb-4">Feedback from your AI Teacher</h3>
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-2xl font-bold">Feedback from your AI Teacher</h3>
+                        <button 
+                            onClick={() => handleGenerateSummary(feedback)}
+                            className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-sky-700 bg-sky-100 rounded-lg hover:bg-sky-200 dark:bg-sky-900/50 dark:text-sky-300 dark:hover:bg-sky-900 btn-pressable"
+                        >
+                            <BookCopy className="h-4 w-4" />
+                            Summarize
+                        </button>
+                    </div>
                     <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
                         <ContentRenderer content={feedback} />
                     </div>
@@ -332,6 +401,15 @@ const ExamMode: React.FC = () => {
 
   return (
     <>
+      {isSummaryModalOpen && (
+        <SummaryModal 
+            onClose={() => setIsSummaryModalOpen(false)}
+            summary={summaryText}
+            isLoading={isSummaryLoading}
+            error={summaryError}
+            title="Feedback Summary"
+        />
+      )}
       {isTutorChatOpen && <TutorChat onClose={() => setIsTutorChatOpen(false)} />}
       {renderContent()}
       

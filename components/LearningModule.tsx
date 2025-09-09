@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { useLocalization } from '../hooks/useLocalization';
-import { generateLearningContent, generateQuiz, generateImageFromPrompt, generateFlashcards, generateDiagnosticQuiz, analyzeDiagnosticResults } from '../services/geminiService';
+import { generateLearningContent, generateQuiz, generateImageFromPrompt, generateFlashcards, generateDiagnosticQuiz, analyzeDiagnosticResults, generateSummary } from '../services/geminiService';
 import { speak } from '../services/speechService';
 import type { LearningContent, Question, Subject, Topic } from '../types';
 import Spinner from './Spinner';
 import ProgressBar from './ProgressBar';
 import { LEARNING_TOPICS } from '../constants';
-import { RefreshCw, Trophy, Undo2, Check, X, Image as ImageIcon, Layers, Volume2, FileText, FilePenLine, File, BookOpen, Lock, BrainCircuit, List, Lightbulb, Target, ArrowRight, Home } from 'lucide-react';
+import { RefreshCw, Trophy, Undo2, Check, X, Image as ImageIcon, Layers, Volume2, FileText, FilePenLine, File, BookOpen, Lock, BrainCircuit, List, Lightbulb, Target, ArrowRight, Home, BookCopy } from 'lucide-react';
 import ContentRenderer from './ContentRenderer';
 
 // #region --- TYPES ---
@@ -20,6 +20,41 @@ type FocusItem = { topic: Topic & { subjectName: string }; reason: PlanReason };
 // #endregion
 
 // The original file was truncated. This is a full implementation based on the surrounding app context to fix the missing default export error.
+
+const SummaryModal: React.FC<{
+  onClose: () => void;
+  summary: string | null;
+  isLoading: boolean;
+  error: string | null;
+  title: string;
+}> = ({ onClose, summary, isLoading, error, title }) => {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center animate-fade-in" onClick={onClose}>
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-lg m-4 animate-slide-in-up" onClick={(e) => e.stopPropagation()}>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">{title}</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-full p-1 focus:outline-none focus:ring-2 focus:ring-slate-400 btn-pressable" aria-label="Close modal">
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+        <div className="max-h-[60vh] overflow-y-auto pr-2">
+          {isLoading ? (
+            <div className="flex justify-center p-8">
+              <Spinner text="Generating summary..." />
+            </div>
+          ) : error ? (
+            <p className="text-red-500 text-center">{error}</p>
+          ) : summary ? (
+            <ContentRenderer content={summary} />
+          ) : (
+            <p className="text-slate-500 text-center">No summary available.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 // #region --- SUB-COMPONENT: TopicView ---
 const TopicView: React.FC<{
@@ -42,6 +77,13 @@ const TopicView: React.FC<{
   const [score, setScore] = useState(0);
   const [isQuizFinished, setIsQuizFinished] = useState(false);
   const [isImageLoading, setIsImageLoading] = useState(false);
+
+  // New state for summary
+  const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
+  const [summaryText, setSummaryText] = useState<string | null>(null);
+  const [isSummaryLoading, setIsSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+
 
   useEffect(() => {
     const loadContent = async () => {
@@ -99,6 +141,23 @@ const TopicView: React.FC<{
         setFlashcards(cards);
     } catch (e: any) {
         setError(e.message || "Failed to generate flashcards.");
+    }
+  };
+
+  const handleGenerateSummary = async () => {
+    if (!content || !userProgress) return;
+    setIsSummaryModalOpen(true);
+    setSummaryText(null);
+    setSummaryError(null);
+    setIsSummaryLoading(true);
+
+    try {
+        const summary = await generateSummary(content.content, userProgress.classLevel);
+        setSummaryText(summary);
+    } catch (e: any) {
+        setSummaryError(e.message || "Failed to generate summary.");
+    } finally {
+        setIsSummaryLoading(false);
     }
   };
 
@@ -196,68 +255,80 @@ const TopicView: React.FC<{
   }
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg animate-fade-in">
-        <header className="p-4 md:p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-            <div>
-                <button onClick={onBack} className="flex items-center text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline btn-pressable">
-                    <Undo2 className="h-4 w-4 mr-1" />
-                    Back to Plan
-                </button>
-                <h2 className="text-2xl font-bold mt-1">{topic.name}</h2>
-            </div>
-            <div className="flex items-center gap-2">
-                <button onClick={() => speak(content.content, currentLang)} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors btn-pressable" aria-label="Read text aloud">
-                    <Volume2 className="h-5 w-5" />
-                </button>
-                <button onClick={finishTopic} className="px-4 py-2 bg-green-600 text-white font-semibold rounded-lg shadow hover:bg-green-700 flex items-center gap-2 btn-pressable">
-                    <Check className="h-5 w-5"/>
-                    Mark as Complete
-                </button>
-            </div>
-        </header>
+    <>
+      {isSummaryModalOpen && (
+        <SummaryModal 
+            onClose={() => setIsSummaryModalOpen(false)}
+            summary={summaryText}
+            isLoading={isSummaryLoading}
+            error={summaryError}
+            title="Lesson Summary"
+        />
+      )}
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg animate-fade-in">
+          <header className="p-4 md:p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+              <div>
+                  <button onClick={onBack} className="flex items-center text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline btn-pressable">
+                      <Undo2 className="h-4 w-4 mr-1" />
+                      Back to Plan
+                  </button>
+                  <h2 className="text-2xl font-bold mt-1">{topic.name}</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                  <button onClick={() => speak(content.content, currentLang)} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors btn-pressable" aria-label="Read text aloud">
+                      <Volume2 className="h-5 w-5" />
+                  </button>
+                  <button onClick={finishTopic} className="px-4 py-2 bg-green-600 text-white font-semibold rounded-lg shadow hover:bg-green-700 flex items-center gap-2 btn-pressable">
+                      <Check className="h-5 w-5"/>
+                      Mark as Complete
+                  </button>
+              </div>
+          </header>
 
-        <div className="flex flex-col md:flex-row">
-            <div className="w-full md:w-3/4 p-4 md:p-6">
-                {currentTool === 'content' && <ContentRenderer content={content.content} />}
-                {currentTool === 'quiz' && renderQuiz()}
-                {currentTool === 'flashcards' && renderFlashcards()}
-            </div>
-            <aside className="w-full md:w-1/4 p-4 md:p-6 border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                <h3 className="font-bold text-lg mb-4">Learning Tools</h3>
-                <div className="space-y-2">
-                    <button onClick={() => setCurrentTool('content')} className="w-full flex items-center gap-2 p-3 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-left btn-pressable"><BookOpen className="h-5 w-5 text-indigo-500"/> Lesson</button>
-                    <button onClick={handleGenerateQuiz} className="w-full flex items-center gap-2 p-3 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-left btn-pressable"><FileText className="h-5 w-5 text-teal-500"/> Practice Quiz</button>
-                    <button onClick={handleGenerateFlashcards} className="w-full flex items-center gap-2 p-3 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-left btn-pressable"><Layers className="h-5 w-5 text-amber-500"/> Flashcards</button>
-                </div>
-                 <div className="mt-6">
-                    <h4 className="font-semibold mb-2 flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                        <ImageIcon className="h-5 w-5" />
-                        Visual Aids
-                    </h4>
-                    {isImageLoading ? (
-                        <div className="flex justify-center items-center h-24">
-                            <Spinner text="Creating image..."/>
-                        </div>
-                    ) : images.length > 0 ? (
-                        <div className="space-y-3">
-                        {images.map((img, i) => (
-                            <img 
-                                key={i} 
-                                src={img} 
-                                alt={`AI generated visual aid ${i + 1} for ${topic.name}`} 
-                                className="rounded-lg shadow-md w-full border border-slate-200 dark:border-slate-700"
-                            />
-                        ))}
-                        </div>
-                    ) : (
-                        <p className="text-xs text-slate-500 dark:text-slate-400 p-2 bg-slate-100 dark:bg-slate-700/50 rounded-md">
-                           No visual aids for this topic.
-                        </p>
-                    )}
-                 </div>
-            </aside>
-        </div>
-    </div>
+          <div className="flex flex-col md:flex-row">
+              <div className="w-full md:w-3/4 p-4 md:p-6">
+                  {currentTool === 'content' && <ContentRenderer content={content.content} />}
+                  {currentTool === 'quiz' && renderQuiz()}
+                  {currentTool === 'flashcards' && renderFlashcards()}
+              </div>
+              <aside className="w-full md:w-1/4 p-4 md:p-6 border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                  <h3 className="font-bold text-lg mb-4">Learning Tools</h3>
+                  <div className="space-y-2">
+                      <button onClick={() => setCurrentTool('content')} className="w-full flex items-center gap-2 p-3 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-left btn-pressable"><BookOpen className="h-5 w-5 text-indigo-500"/> Lesson</button>
+                      <button onClick={handleGenerateQuiz} className="w-full flex items-center gap-2 p-3 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-left btn-pressable"><FileText className="h-5 w-5 text-teal-500"/> Practice Quiz</button>
+                      <button onClick={handleGenerateFlashcards} className="w-full flex items-center gap-2 p-3 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-left btn-pressable"><Layers className="h-5 w-5 text-amber-500"/> Flashcards</button>
+                      <button onClick={handleGenerateSummary} className="w-full flex items-center gap-2 p-3 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-left btn-pressable"><BookCopy className="h-5 w-5 text-sky-500"/> Summarize Lesson</button>
+                  </div>
+                   <div className="mt-6">
+                      <h4 className="font-semibold mb-2 flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                          <ImageIcon className="h-5 w-5" />
+                          Visual Aids
+                      </h4>
+                      {isImageLoading ? (
+                          <div className="flex justify-center items-center h-24">
+                              <Spinner text="Creating image..."/>
+                          </div>
+                      ) : images.length > 0 ? (
+                          <div className="space-y-3">
+                          {images.map((img, i) => (
+                              <img 
+                                  key={i} 
+                                  src={img} 
+                                  alt={`AI generated visual aid ${i + 1} for ${topic.name}`} 
+                                  className="rounded-lg shadow-md w-full border border-slate-200 dark:border-slate-700"
+                              />
+                          ))}
+                          </div>
+                      ) : (
+                          <p className="text-xs text-slate-500 dark:text-slate-400 p-2 bg-slate-100 dark:bg-slate-700/50 rounded-md">
+                             No visual aids for this topic.
+                          </p>
+                      )}
+                   </div>
+              </aside>
+          </div>
+      </div>
+    </>
   );
 };
 // #endregion

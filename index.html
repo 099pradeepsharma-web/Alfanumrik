@@ -11,9 +11,16 @@
       if (!window.process) {
         window.process = {
           env: {
-            // Your Google AI API Key
+            // Your Google AI API Key (if you change this, be sure it's valid)
             API_KEY: "AIzaSyDezSOh-MZmUSBwYcfWu50Tc0aEuwNxD_o",
-            // IMPORTANT: Replace with your Supabase Public Anon Key
+            
+            // --- IMPORTANT: CONFIGURE YOUR SUPABASE BACKEND HERE ---
+            // 1. Go to your Supabase project dashboard.
+            // 2. Navigate to Settings > API.
+            // 3. Copy the 'Project URL' and paste it below.
+            SUPABASE_URL: "https://vcpmwyscdrkyehidhglo.supabase.co",
+            
+            // 4. Copy the public 'anon' key and paste it below.
             SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZjcG1wd3lzY2Rya3loaWRoZ2xvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzMTQ0OTgsImV4cCI6MjA3MDg5MDQ5OH0.VD4hKv_KARzNWKH8gnAOkrA6wAJ1VCdj-eJeLwF_qhA"
           }
         };
@@ -167,12 +174,13 @@
   <script type="importmap">
 {
   "imports": {
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.17.0",
-    "react/": "https://aistudiocdn.com/react@^19.1.1/",
-    "react": "https://aistudiocdn.com/react@^19.1.1",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
-    "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.542.0"
+    "@google/genai": "https://esm.sh/@google/genai@1.17.0",
+    "react": "https://esm.sh/react@19.1.1",
+    "react/": "https://esm.sh/react@19.1.1/",
+    "react-dom": "https://esm.sh/react-dom@19.1.1",
+    "react-dom/": "https://esm.sh/react-dom@19.1.1/",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2",
+    "lucide-react": "https://esm.sh/lucide-react@0.542.0"
   }
 }
 </script>

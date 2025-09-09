@@ -431,3 +431,28 @@ Please provide feedback based on the criteria.`;
         throw handleGeminiError(error, 'analyzing your essay');
     }
 }
+
+export async function generateSummary(content: string, classLevel: string): Promise<string> {
+    try {
+        const prompt = `
+            You are an expert at creating concise summaries for students.
+            Summarize the following learning content for a Class ${classLevel} student in India.
+            Focus on the key concepts and most important points.
+            The summary should be clear, easy to understand, and presented in 2-3 short paragraphs or a few bullet points.
+
+            Content to summarize:
+            ---
+            ${content}
+            ---
+        `;
+
+        const response = await ai.models.generateContent({
+            model,
+            contents: prompt,
+        });
+
+        return response.text.trim();
+    } catch (error) {
+        throw handleGeminiError(error, 'creating a summary');
+    }
+}
