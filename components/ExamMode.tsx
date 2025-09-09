@@ -92,9 +92,11 @@ const ExamMode: React.FC = () => {
       setScore(0);
       setIsFinished(false);
       setSelectedAnswer(null);
+      setMode('quiz');
     } catch (e) {
       setError('Failed to generate exam. Please try again.');
       console.error(e);
+      setMode('selection');
     } finally {
       setIsLoading(false);
     }
@@ -104,6 +106,7 @@ const ExamMode: React.FC = () => {
     setTopic(selectedTopic);
     setIsGeneratingPrompt(true);
     setError(null);
+    setMode('writing');
     try {
         if (!userProgress) throw new Error("User progress not available");
         const prompt = await generateEssayPrompt(selectedTopic, userProgress.classLevel);
@@ -111,6 +114,7 @@ const ExamMode: React.FC = () => {
     } catch (e) {
         setError('Failed to generate a writing prompt. Please try again.');
         console.error(e);
+        setMode('selection');
     } finally {
         setIsGeneratingPrompt(false);
     }
@@ -200,54 +204,39 @@ const ExamMode: React.FC = () => {
   };
   
   const renderSelectionScreen = () => (
-    <div className="max-w-2xl mx-auto text-center">
+    <div className="max-w-4xl mx-auto text-center">
         <h2 className="text-3xl font-bold">{t('exam_mode')}</h2>
         <p className="text-slate-500 mt-2">Test your knowledge and practice your skills!</p>
         <div className="mt-8 grid md:grid-cols-2 gap-6">
-            <button 
-                onClick={() => setMode('quiz')} 
-                className="flex flex-col items-center justify-center p-8 bg-white dark:bg-slate-800 rounded-lg shadow-lg interactive-card hover:bg-indigo-50 dark:hover:bg-slate-700 transition-colors btn-pressable"
-            >
-                <FileText className="h-12 w-12 text-indigo-500 mb-4" />
+            {/* Topic Selection for Quiz */}
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6">
+                <FileText className="h-12 w-12 text-indigo-500 mb-4 mx-auto" />
                 <h3 className="font-semibold text-xl">Multiple Choice Quiz</h3>
-                <p className="text-sm text-slate-500 mt-1">Answer questions against the clock.</p>
-            </button>
-            <button 
-                onClick={() => setMode('writing')}
-                className="flex flex-col items-center justify-center p-8 bg-white dark:bg-slate-800 rounded-lg shadow-lg interactive-card hover:bg-teal-50 dark:hover:bg-slate-700 transition-colors btn-pressable"
-            >
-                <Edit className="h-12 w-12 text-teal-500 mb-4" />
+                <p className="text-sm text-slate-500 mt-1 mb-4">Select a subject to start a quiz.</p>
+                <div className="space-y-2">
+                    {EXAM_TOPICS.slice(0, 4).map(t => (
+                        <button key={t} onClick={() => startQuiz(t)} className="w-full p-2 bg-slate-100 dark:bg-slate-700 rounded-md interactive-card hover:bg-indigo-100 dark:hover:bg-slate-600 btn-pressable">{t}</button>
+                    ))}
+                </div>
+            </div>
+            {/* Topic Selection for Writing */}
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6">
+                <Edit className="h-12 w-12 text-teal-500 mb-4 mx-auto" />
                 <h3 className="font-semibold text-xl">Writing Practice</h3>
-                <p className="text-sm text-slate-500 mt-1">Get essay prompts and AI feedback.</p>
-            </button>
+                <p className="text-sm text-slate-500 mt-1 mb-4">Get an essay prompt and AI feedback.</p>
+                 <div className="space-y-2">
+                    {EXAM_TOPICS.slice(0, 4).map(t => (
+                        <button key={t} onClick={() => startWritingPractice(t)} className="w-full p-2 bg-slate-100 dark:bg-slate-700 rounded-md interactive-card hover:bg-teal-100 dark:hover:bg-slate-600 btn-pressable">{t}</button>
+                    ))}
+                </div>
+            </div>
         </div>
     </div>
-  );
-
-  const renderTopicSelection = (onSelect: (topic: string) => void) => (
-      <div className="max-w-2xl mx-auto text-center">
-        <h2 className="text-3xl font-bold">Select a Subject</h2>
-        <p className="text-slate-500 mt-2">Choose a subject to begin your practice.</p>
-        <div className="mt-6 grid gap-4">
-          {EXAM_TOPICS.map(t => (
-            <button key={t} onClick={() => onSelect(t)} className="w-full p-4 bg-white dark:bg-slate-800 rounded-lg shadow font-semibold text-lg interactive-card hover:bg-indigo-50 dark:hover:bg-slate-700 transition-colors btn-pressable">
-              {t}
-            </button>
-          ))}
-        </div>
-        <button onClick={resetExam} className="mt-6 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
-            Back to Exam Type Selection
-        </button>
-      </div>
   );
 
   const renderQuizMode = () => {
     if (isLoading) {
         return <div className="flex justify-center mt-10"><Spinner text="Preparing your quiz..." /></div>;
-    }
-
-    if (!topic) {
-        return renderTopicSelection(startQuiz);
     }
   
     if (isFinished) {
@@ -316,10 +305,6 @@ const ExamMode: React.FC = () => {
   const renderWritingMode = () => {
     if (isGeneratingPrompt) {
         return <div className="flex justify-center mt-10"><Spinner text="Generating your writing prompt..." /></div>;
-    }
-
-    if (!topic) {
-        return renderTopicSelection(startWritingPractice);
     }
     
     if (!writingPrompt) {

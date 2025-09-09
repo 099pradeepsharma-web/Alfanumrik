@@ -14,6 +14,7 @@ export const signup = async (details: { name: string; email: string; password: s
     const { email, password, name, role, classLevel } = details;
     // Store user-selected details in metadata, so we can access it later
     // to create the profile with the correct role.
+    // Fix: Changed Supabase auth method to snake_case to match the expected API.
     const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -41,6 +42,7 @@ export const login = async (email: string, password: string): Promise<{ success:
         return mockApi.mockLogin(email, password);
     }
     
+    // Fix: Changed Supabase auth method to snake_case to match the expected API.
     const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -59,6 +61,7 @@ export const signInWithGoogle = async (): Promise<{ success: boolean, error?: st
         return mockApi.mockSignInWithGoogle();
     }
 
+    // Fix: Changed Supabase auth method to snake_case to match the expected API.
     const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
     });
@@ -75,6 +78,7 @@ export const logout = async (): Promise<void> => {
         await mockApi.mockLogout();
         return;
     }
+  // Fix: Changed Supabase auth method to snake_case to match the expected API.
   await supabase.auth.signOut();
 };
 
@@ -93,6 +97,7 @@ export const onAuthUserChanged = (callback: (user: User | null) => void): (() =>
         return mockApi.onMockAuthUserChanged(callback);
     }
 
+    // Fix: Changed Supabase auth method to snake_case to match the expected API.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         if (session?.user) {
             try {

@@ -4,6 +4,7 @@ import { useLocalization } from '../hooks/useLocalization';
 import type { Language, View } from '../types';
 import * as authService from '../services/authService';
 import { Settings } from 'lucide-react';
+import Logo from './Logo';
 
 const NavButton: React.FC<{ viewName: View; currentView: View; onClick: (view: View) => void; children: React.ReactNode }> = ({ viewName, currentView, onClick, children }) => {
   const isActive = viewName === currentView;
@@ -48,9 +49,7 @@ const Header: React.FC = () => {
     <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-lg shadow-sm sticky top-0 z-50">
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-            <span role="img" aria-label="brain">🧠</span> AlfaNumric
-          </h1>
+          <Logo textClassName="text-2xl" />
           {currentUser && (
             <nav className="hidden md:flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
                 <button onClick={handleDashboardClick} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors btn-pressable ${

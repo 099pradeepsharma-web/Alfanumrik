@@ -21,11 +21,11 @@ interface NotificationProps {
 
 const Notification: React.FC<NotificationProps> = ({ message, icon, onClose }) => {
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const timer = window.setTimeout(() => {
       onClose();
     }, 5000); 
 
-    return () => clearTimeout(timer);
+    return () => window.clearTimeout(timer);
   }, [onClose]);
 
   return (

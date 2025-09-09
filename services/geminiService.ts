@@ -1,4 +1,3 @@
-
 // Fix: Added full content for geminiService.ts
 import { GoogleGenAI, Type } from "@google/genai";
 import type { LearningContent, Question, Topic } from '../types';
@@ -176,8 +175,8 @@ export async function generateQuiz(topic: string, numberOfQuestions: number, cla
     }
 }
 
-export async function generateDiagnosticQuiz(classLevel: string, topics: Topic[]): Promise<Question[]> {
-    const cacheKey = `diagnostic_quiz::${classLevel}`;
+export async function generateDiagnosticQuiz(classLevel: string, topics: Topic[], numberOfQuestions: number): Promise<Question[]> {
+    const cacheKey = `diagnostic_quiz::${classLevel}::${numberOfQuestions}`;
     try {
         const cachedData = await getCachedContent(cacheKey);
         if (cachedData && cachedData.questions) {
@@ -186,14 +185,15 @@ export async function generateDiagnosticQuiz(classLevel: string, topics: Topic[]
         }
 
         console.log("Cache miss for diagnostic quiz:", cacheKey);
-        const topicSubset = topics.sort(() => 0.5 - Math.random()).slice(0, 10); // Pick up to 10 random topics
+        const topicsToSample = Math.min(topics.length, numberOfQuestions);
+        const topicSubset = topics.sort(() => 0.5 - Math.random()).slice(0, topicsToSample);
         const topicNames = topicSubset.map(t => `"${t.name}" (ID: ${t.id})`).join(', ');
 
         const prompt = `
             You are an AI curriculum expert creating a diagnostic quiz for a Class ${classLevel} student in the Indian CBSE system.
             Your goal is to gauge the student's foundational knowledge across various subjects.
 
-            Create a 10-question multiple-choice quiz.
+            Create a ${numberOfQuestions}-question multiple-choice quiz.
             - Each question must be from a **different topic** from the following list: ${topicNames}.
             - For each question, you MUST specify the original topic ID in the 'topic' field. This is crucial.
             - The questions should be fundamental, covering the most important concept from each topic.

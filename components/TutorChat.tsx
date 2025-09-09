@@ -82,8 +82,6 @@ const TutorChat: React.FC<TutorChatProps> = ({ onClose }) => {
                     const textPart = { text: messageText };
     
                     // Send message with both text and image parts
-                    // Fix: The sendMessage method expects an object with a 'message' property,
-                    // which can be a string or an array of parts.
                     response = await chatRef.current.sendMessage({ message: [textPart, imagePart] });
                 } else {
                     // Fallback to text-only if canvas fails

@@ -7,7 +7,7 @@ import type { LearningContent, Question, Subject, Topic } from '../types';
 import Spinner from './Spinner';
 import ProgressBar from './ProgressBar';
 import { LEARNING_TOPICS } from '../constants';
-import { RefreshCw, Trophy, Undo2, Check, X, Image as ImageIcon, Layers, Volume2, FileText, FilePenLine, File, BookOpen, Lock, BrainCircuit, List, Lightbulb, Target, ArrowRight, Home, BookCopy } from 'lucide-react';
+import { RefreshCw, Trophy, Undo2, Check, X, Image as ImageIcon, Layers, Volume2, FileText, FilePenLine, File, BookOpen, Lock, BrainCircuit, List, Lightbulb, Target, ArrowRight, Home, BookCopy, Clock, ArrowLeft } from 'lucide-react';
 import ContentRenderer from './ContentRenderer';
 
 // #region --- TYPES ---
@@ -339,7 +339,6 @@ const LearningDashboard: React.FC<{
     onStartDiagnostic: () => void;
 }> = ({ onSelectTopic, onStartDiagnostic }) => {
     const { userProgress } = useAppContext();
-    const [dashboardView, setDashboardView] = useState<DashboardView>('plan');
 
     const subjects = LEARNING_TOPICS[userProgress?.classLevel || '6'] || [];
     const allTopics = useMemo(() => subjects.flatMap(s => s.topics.map(t => ({...t, subjectName: s.name}))), [subjects]);
@@ -348,66 +347,72 @@ const LearningDashboard: React.FC<{
         if (!userProgress) return [];
         const plan: FocusItem[] = [];
         const { weaknesses, strengths, completedTopics } = userProgress;
-        
+
         // Add weaknesses first
         weaknesses?.forEach(id => {
             const topic = allTopics.find(t => t.id === id);
             if (topic) plan.push({ topic, reason: 'Weakness' });
         });
-        
+
         // Add next logical topics
         const nextTopics = allTopics.filter(t => 
             !completedTopics.includes(t.id) &&
             t.prerequisites?.every(p => completedTopics.includes(p))
         );
         if(nextTopics.length > 0) plan.push({ topic: nextTopics[0], reason: 'Next Step' });
-        
+
         // Add a strength to revise
         strengths?.forEach(id => {
             const topic = allTopics.find(t => t.id === id);
             if (topic && completedTopics.includes(id)) plan.push({ topic, reason: 'Strength' });
         });
 
-        return plan.slice(0, 5); // Limit to 5 items
+        return Array.from(new Map(plan.map(item => [item.topic.id, item])).values()).slice(0, 5);
     }, [userProgress, allTopics]);
-    
+
     const renderReason = (reason: PlanReason) => {
         switch(reason) {
-            case 'Weakness': return <span className="text-xs font-semibold bg-red-100 text-red-800 px-2 py-1 rounded-full">Focus Area</span>;
-            case 'Next Step': return <span className="text-xs font-semibold bg-blue-100 text-blue-800 px-2 py-1 rounded-full">Next Up</span>;
-            case 'Strength': return <span className="text-xs font-semibold bg-green-100 text-green-800 px-2 py-1 rounded-full">Revise</span>;
+            case 'Weakness': return <span className="text-xs font-semibold bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200 px-2 py-1 rounded-full">Focus Area</span>;
+            case 'Next Step': return <span className="text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200 px-2 py-1 rounded-full">Next Up</span>;
+            case 'Strength': return <span className="text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200 px-2 py-1 rounded-full">Revise</span>;
             default: return null;
         }
     }
-    
+
     return (
         <div className="space-y-6">
             <div className="bg-white dark:bg-slate-800 shadow-lg rounded-xl p-6">
                 <h2 className="text-3xl font-bold">Learning Zone</h2>
-                <p className="text-slate-500 mt-1">Your personalized path to mastery.</p>
+                <p className="text-slate-500 dark:text-slate-400 mt-1">Your personalized path to mastery.</p>
                 <div className="mt-4 border-t border-slate-200 dark:border-slate-700 pt-4">
-                    <button onClick={onStartDiagnostic} className="text-indigo-600 dark:text-indigo-400 font-semibold hover:underline flex items-center gap-2">
+                    <button onClick={onStartDiagnostic} className="text-indigo-600 dark:text-indigo-400 font-semibold hover:underline flex items-center gap-2 btn-pressable">
                         <BrainCircuit className="h-5 w-5" /> Retake Diagnostic Test
                     </button>
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md p-6">
-                 <h3 className="text-xl font-bold mb-4">Your Personalized Plan</h3>
-                 <div className="space-y-3">
-                    {learningPlan.map(({ topic, reason }) => (
-                        <div key={topic.id} onClick={() => onSelectTopic(topic)} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg cursor-pointer hover:shadow-md transition-shadow">
-                            <div className="flex items-center gap-4">
-                                <span className="text-3xl">{topic.icon}</span>
-                                <div>
-                                    <h4 className="font-semibold">{topic.name}</h4>
-                                    <p className="text-sm text-slate-500">{topic.subjectName}</p>
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md p-6 animate-fade-in">
+                 <h3 className="text-xl font-bold mb-4 text-slate-800 dark:text-slate-100">Your Personalized Plan</h3>
+                 {learningPlan.length > 0 ? (
+                    <div className="space-y-3">
+                        {learningPlan.map(({ topic, reason }) => (
+                            <div key={topic.id} onClick={() => onSelectTopic(topic)} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg cursor-pointer hover:shadow-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-all duration-200 interactive-card">
+                                <div className="flex items-center gap-4">
+                                    <span className="text-3xl">{topic.icon}</span>
+                                    <div>
+                                        <h4 className="font-semibold text-slate-800 dark:text-slate-200">{topic.name}</h4>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400">{topic.subjectName}</p>
+                                    </div>
                                 </div>
+                                {renderReason(reason)}
                             </div>
-                            {renderReason(reason)}
-                        </div>
-                    ))}
-                 </div>
+                        ))}
+                    </div>
+                 ) : (
+                    <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                        <p>Your personalized plan will appear here after you complete the diagnostic test.</p>
+                    </div>
+                 )}
             </div>
         </div>
     );
@@ -424,54 +429,205 @@ const DiagnosticQuiz: React.FC<{
     const [answers, setAnswers] = useState<{ [key: string]: string }>({});
     const [isLoading, setIsLoading] = useState(true);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const TOTAL_QUESTIONS = 25;
+    const QUIZ_DURATION_SECONDS = 25 * 60; // 25 minutes
+
+    const [timeLeft, setTimeLeft] = useState(QUIZ_DURATION_SECONDS);
+    const timerRef = useRef<number | null>(null);
+    const isMounted = useRef(true);
+    const quizStarted = useRef(false);
+
+    useEffect(() => {
+        isMounted.current = true;
+        return () => {
+            isMounted.current = false;
+        };
+    }, []);
+
+    const finishQuiz = useCallback(async () => {
+        if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+        }
+        if (isAnalyzing) return;
+
+        if (isMounted.current) {
+            setIsAnalyzing(true);
+            setError(null);
+        }
+        
+        const answeredQuestions = questions.filter(q => answers[q.id]);
+        if (answeredQuestions.length === 0) {
+            onComplete([], []);
+            return;
+        }
+
+        const results = answeredQuestions.map(q => ({
+            question: q,
+            userAnswer: answers[q.id],
+        }));
+        
+        try {
+            const { strengths, weaknesses } = await analyzeDiagnosticResults(results);
+            onComplete(strengths, weaknesses);
+        } catch (e: any) {
+             if (isMounted.current) {
+                setError(e.message || 'Failed to analyze your quiz results.');
+                setIsAnalyzing(false);
+             }
+        }
+    }, [questions, answers, onComplete, isAnalyzing]);
+
+
+    useEffect(() => {
+        if (timeLeft <= 0) {
+            finishQuiz();
+        }
+    }, [timeLeft, finishQuiz]);
 
     useEffect(() => {
         const startQuiz = async () => {
             if (!userProgress) return;
-            const subjects = LEARNING_TOPICS[userProgress.classLevel] || [];
-            const allTopics = subjects.flatMap(s => s.topics);
-            const quizQuestions = await generateDiagnosticQuiz(userProgress.classLevel, allTopics);
-            setQuestions(quizQuestions);
-            setIsLoading(false);
+            setIsLoading(true);
+            setError(null);
+            try {
+                const subjects = LEARNING_TOPICS[userProgress.classLevel] || [];
+                const allTopics = subjects.flatMap(s => s.topics);
+                if (allTopics.length === 0) {
+                    throw new Error(`No topics found for Class ${userProgress.classLevel}.`);
+                }
+                const quizQuestions = await generateDiagnosticQuiz(userProgress.classLevel, allTopics, TOTAL_QUESTIONS);
+                
+                if (isMounted.current) {
+                    setQuestions(quizQuestions);
+                    setTimeLeft(QUIZ_DURATION_SECONDS);
+
+                    if (timerRef.current) clearInterval(timerRef.current);
+                    timerRef.current = window.setInterval(() => {
+                        setTimeLeft(prev => {
+                            if (prev <= 1) {
+                                if (timerRef.current) clearInterval(timerRef.current);
+                                return 0;
+                            }
+                            return prev - 1;
+                        });
+                    }, 1000);
+                }
+
+            } catch (e: any) {
+                if (isMounted.current) {
+                    setError(e.message || 'Failed to start diagnostic quiz.');
+                }
+            } finally {
+                if (isMounted.current) {
+                    setIsLoading(false);
+                }
+            }
         };
-        startQuiz();
+        
+        if (userProgress && !quizStarted.current) {
+            quizStarted.current = true;
+            startQuiz();
+        }
+
+        return () => {
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+            }
+        };
     }, [userProgress]);
 
     const handleAnswer = (questionId: string, answer: string) => {
         setAnswers(prev => ({ ...prev, [questionId]: answer }));
-        setTimeout(() => {
-            if (current < questions.length - 1) {
-                setCurrent(c => c + 1);
-            } else {
-                finishQuiz();
-            }
-        }, 300);
     };
     
-    const finishQuiz = async () => {
-        setIsAnalyzing(true);
-        const results = questions.map(q => ({
-            question: q,
-            userAnswer: answers[q.id],
-        }));
-        const { strengths, weaknesses } = await analyzeDiagnosticResults(results);
-        onComplete(strengths, weaknesses);
-    }
-    
+    const goToNext = () => {
+        if (current < questions.length - 1) {
+            setCurrent(c => c + 1);
+        }
+    };
+
+    const goToPrevious = () => {
+        if (current > 0) {
+            setCurrent(c => c - 1);
+        }
+    };
+
     if (isLoading) return <div className="p-8 text-center"><Spinner text="Preparing your diagnostic test..." /></div>;
     if (isAnalyzing) return <div className="p-8 text-center"><Spinner text="Analyzing your results..." /></div>;
+    
+    if (error) {
+        return <div className="p-8 text-center text-red-500 bg-red-50 dark:bg-red-900/20 rounded-lg">{error}</div>;
+    }
+    
+    if (questions.length === 0) {
+        return <div className="p-8 text-center text-slate-500">No questions available for your class level.</div>;
+    }
 
     const q = questions[current];
+    const allAnswered = Object.keys(answers).length === questions.length;
+    const minutes = Math.floor(timeLeft / 60);
+    const seconds = timeLeft % 60;
+    const formattedTime = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
     return (
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-8 max-w-2xl mx-auto">
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 md:p-8 max-w-3xl mx-auto">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                <div>
+                    <h2 className="text-2xl font-bold">Diagnostic Test</h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Answer all questions to get your personalized plan.</p>
+                </div>
+                <div className={`flex items-center gap-2 font-semibold text-lg p-2 rounded-lg ${timeLeft < 300 ? 'text-red-500 bg-red-100 dark:bg-red-900/30' : ''}`}>
+                    <Clock className="h-5 w-5" />
+                    <span>{formattedTime}</span>
+                </div>
+            </div>
+            
             <ProgressBar value={current + 1} max={questions.length} label={`Question ${current + 1}/${questions.length}`} />
-            <h3 className="text-xl font-semibold my-6">{q.questionText}</h3>
+            
+            <div className="my-6 min-h-[80px]">
+                <h3 className="text-xl font-semibold">{q.questionText}</h3>
+            </div>
+            
             <div className="space-y-3">
                 {q.options.map(opt => (
-                    <button key={opt} onClick={() => handleAnswer(q.id, opt)} className="w-full text-left p-4 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-indigo-100 dark:hover:bg-slate-600 transition-colors btn-pressable">
+                    <button 
+                        key={opt} 
+                        onClick={() => handleAnswer(q.id, opt)} 
+                        className={`w-full text-left p-4 rounded-lg border-2 transition-all duration-150 btn-pressable ${
+                            answers[q.id] === opt
+                            ? 'bg-indigo-100 dark:bg-indigo-900/50 border-indigo-500 ring-2 ring-indigo-300'
+                            : 'bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 border-transparent'
+                        }`}
+                    >
                         {opt}
                     </button>
                 ))}
+            </div>
+
+            <div className="flex justify-between items-center mt-8 pt-4 border-t border-slate-200 dark:border-slate-700">
+                <button onClick={goToPrevious} disabled={current === 0} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 bg-slate-200 dark:bg-slate-700 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed btn-pressable">
+                    <ArrowLeft className="h-4 w-4" />
+                    Previous
+                </button>
+
+                {current < questions.length - 1 ? (
+                    <button onClick={goToNext} className="flex items-center gap-2 px-6 py-2 font-semibold text-white bg-indigo-600 rounded-lg shadow hover:bg-indigo-700 btn-pressable">
+                        Next
+                        <ArrowRight className="h-4 w-4" />
+                    </button>
+                ) : (
+                    <button 
+                        onClick={finishQuiz} 
+                        disabled={!allAnswered}
+                        className="px-6 py-2 font-semibold text-white bg-green-600 rounded-lg shadow hover:bg-green-700 disabled:bg-slate-400 disabled:cursor-not-allowed btn-pressable"
+                        title={!allAnswered ? 'Please answer all questions before submitting' : 'Submit your test'}
+                    >
+                        Submit Test
+                    </button>
+                )}
             </div>
         </div>
     );
@@ -496,7 +652,7 @@ const LearningModule: React.FC = () => {
   }, [userProgress]);
 
   const handleDiagnosticComplete = (strengths: string[], weaknesses: string[]) => {
-    updateProgress({ strengths, weaknesses });
+    updateProgress({ strengths, weaknesses, completedTopics: [] }); // Reset completed topics on new diagnostic
     showNotification({ message: "Diagnostic complete! We've created a personalized learning plan for you.", icon: '🎉' });
     setViewMode('dashboard');
   };
