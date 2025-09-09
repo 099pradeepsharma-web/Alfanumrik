@@ -1,6 +1,7 @@
 // Fix: Added full content for geminiService.ts
 import { GoogleGenAI, Type } from "@google/genai";
 import type { LearningContent, Question, Topic } from '../types';
+import { getCachedContent, setCachedContent } from './databaseService';
 
 if (!process.env.API_KEY) {
     console.warn("API_KEY environment variable not set.");
@@ -41,7 +42,16 @@ function handleGeminiError(error: unknown, context: string): Error {
 }
 
 export async function generateLearningContent(topicId: string, topicName: string, classLevel: string): Promise<LearningContent> {
-    const prompt = `You are an expert educator specializing in the Indian CBSE curriculum.
+    const cacheKey = `learning_content::${topicId}::${classLevel}`;
+    try {
+        const cachedContent = await getCachedContent(cacheKey);
+        if (cachedContent) {
+            console.log("Cache hit for learning content:", cacheKey);
+            return cachedContent as LearningContent;
+        }
+
+        console.log("Cache miss for learning content:", cacheKey);
+        const prompt = `You are an expert educator specializing in the Indian CBSE curriculum.
 Generate a concise and engaging learning module on the topic "${topicName}" for a Class ${classLevel} student.
 
 Your response MUST be a single, valid JSON object with the following fields:
@@ -62,7 +72,6 @@ Details for "imagePrompts":
 - Example for Photosynthesis: "A detailed diagram of photosynthesis in a plant cell. Style: educational illustration. Key elements: chloroplast, sunlight, water, carbon dioxide, oxygen, and glucose, with arrows showing the process flow."
 `;
 
-    try {
         const response = await ai.models.generateContent({
             model,
             contents: prompt,
@@ -92,28 +101,39 @@ Details for "imagePrompts":
             throw new Error("Failed to generate learning content: the AI returned an empty response.");
         }
 
-        try {
-            // Sanitize the response to handle potential markdown code blocks
-            let jsonString = responseText;
-            if (jsonString.startsWith("```json")) {
-                jsonString = jsonString.substring(7, jsonString.length - 3).trim();
-            } else if (jsonString.startsWith("```")) {
-                jsonString = jsonString.substring(3, jsonString.length - 3).trim();
-            }
-
-            const json = JSON.parse(jsonString);
-            return { ...json, topicId: topicId } as LearningContent;
-        } catch (e) {
-            console.error("Failed to parse JSON from Gemini response:", responseText, e);
-            throw new Error("The AI returned an invalid format. Please try again.");
+        
+        // Sanitize the response to handle potential markdown code blocks
+        let jsonString = responseText;
+        if (jsonString.startsWith("```json")) {
+            jsonString = jsonString.substring(7, jsonString.length - 3).trim();
+        } else if (jsonString.startsWith("```")) {
+            jsonString = jsonString.substring(3, jsonString.length - 3).trim();
         }
+
+        const json = JSON.parse(jsonString);
+        const finalContent = { ...json, topicId: topicId } as LearningContent;
+        
+        // Asynchronously cache the result
+        setCachedContent(cacheKey, 'learning_content', finalContent).catch(err => {
+            console.error("Failed to cache learning content:", err);
+        });
+        
+        return finalContent;
     } catch (error) {
         throw handleGeminiError(error, 'generating your lesson');
     }
 }
 
 export async function generateQuiz(topic: string, numberOfQuestions: number, classLevel: string): Promise<Question[]> {
+    const cacheKey = `quiz::${topic.replace(/\s+/g, '_')}::${classLevel}::${numberOfQuestions}`;
     try {
+        const cachedData = await getCachedContent(cacheKey);
+        if (cachedData && cachedData.questions) {
+            console.log("Cache hit for quiz:", cacheKey);
+            return cachedData.questions as Question[];
+        }
+
+        console.log("Cache miss for quiz:", cacheKey);
         const prompt = `Create a quiz with ${numberOfQuestions} multiple-choice questions about "${topic}" for a Class ${classLevel} student. For each question, provide 4 options, the correct answer, and a brief explanation for the correct answer. The topic is ${topic}.`;
 
         const response = await ai.models.generateContent({
@@ -144,6 +164,11 @@ export async function generateQuiz(topic: string, numberOfQuestions: number, cla
         });
 
         const json = JSON.parse(response.text);
+        
+        setCachedContent(cacheKey, 'quiz', json).catch(err => {
+            console.error("Failed to cache quiz:", err);
+        });
+
         return json.questions;
     } catch (error) {
         throw handleGeminiError(error, 'generating your quiz');
@@ -151,7 +176,15 @@ export async function generateQuiz(topic: string, numberOfQuestions: number, cla
 }
 
 export async function generateDiagnosticQuiz(classLevel: string, topics: Topic[]): Promise<Question[]> {
+    const cacheKey = `diagnostic_quiz::${classLevel}`;
     try {
+        const cachedData = await getCachedContent(cacheKey);
+        if (cachedData && cachedData.questions) {
+            console.log("Cache hit for diagnostic quiz:", cacheKey);
+            return cachedData.questions as Question[];
+        }
+
+        console.log("Cache miss for diagnostic quiz:", cacheKey);
         const topicSubset = topics.sort(() => 0.5 - Math.random()).slice(0, 10); // Pick up to 10 random topics
         const topicNames = topicSubset.map(t => `"${t.name}" (ID: ${t.id})`).join(', ');
 
@@ -197,6 +230,11 @@ export async function generateDiagnosticQuiz(classLevel: string, topics: Topic[]
         });
 
         const json = JSON.parse(response.text);
+        
+        setCachedContent(cacheKey, 'diagnostic_quiz', json).catch(err => {
+            console.error("Failed to cache diagnostic quiz:", err);
+        });
+
         return json.questions;
     } catch (error) {
         throw handleGeminiError(error, 'generating your diagnostic test');
@@ -336,7 +374,15 @@ export async function generateStudyPlan(studentName: string, weaknesses: string[
 }
 
 export async function generateFlashcards(content: string, topic: string, classLevel: string): Promise<{term: string, definition: string}[]> {
+    const cacheKey = `flashcards::${topic.replace(/\s+/g, '_')}::${classLevel}`;
     try {
+        const cachedData = await getCachedContent(cacheKey);
+        if (cachedData && cachedData.flashcards) {
+            console.log("Cache hit for flashcards:", cacheKey);
+            return cachedData.flashcards as {term: string, definition: string}[];
+        }
+        
+        console.log("Cache miss for flashcards:", cacheKey);
         const prompt = `
             Based on the following learning content about "${topic}" for a Class ${classLevel} student, please identify 5 to 7 key terms or concepts.
             For each term, provide a very concise and easy-to-understand definition suitable for a flashcard. The definition should be a single sentence if possible.
@@ -374,6 +420,11 @@ export async function generateFlashcards(content: string, topic: string, classLe
         });
 
         const json = JSON.parse(response.text);
+        
+        setCachedContent(cacheKey, 'flashcards', json).catch(err => {
+            console.error("Failed to cache flashcards:", err);
+        });
+
         return json.flashcards;
     } catch (error) {
         throw handleGeminiError(error, 'creating flashcards');

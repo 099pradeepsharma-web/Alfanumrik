@@ -216,3 +216,56 @@ export const submitFeedback = async (userId: string, rating: number, comments: s
         throw new Error('Could not submit feedback.');
     }
 };
+
+/**
+ * Retrieves cached AI-generated content from the database.
+ * @param cacheKey A unique key identifying the content.
+ * @returns The cached content object or null if not found.
+ */
+export const getCachedContent = async (cacheKey: string): Promise<any | null> => {
+    if (isUsingMocks) {
+        return null;
+    }
+
+    const { data, error } = await supabase
+        .from('ai_generated_content')
+        .select('generated_content')
+        .eq('cache_key', cacheKey)
+        .single();
+
+    if (error) {
+        if (error.code !== 'PGRST116') { // Ignore 'exact one row' error for cache misses
+            console.error('Error fetching cached content:', error);
+        }
+        return null;
+    }
+
+    return data ? data.generated_content : null;
+};
+
+/**
+ * Stores newly generated AI content in the cache.
+ * @param cacheKey A unique key for the content.
+ * @param contentType The type of content (e.g., 'learning_content').
+ * @param content The JSON object to be cached.
+ */
+export const setCachedContent = async (cacheKey: string, contentType: string, content: any): Promise<void> => {
+    if (isUsingMocks) {
+        return;
+    }
+
+    const { error } = await supabase
+        .from('ai_generated_content')
+        .insert({
+            cache_key: cacheKey,
+            content_type: contentType,
+            generated_content: content,
+        });
+
+    if (error) {
+        // It's possible another user cached it in the meantime, so unique key violation is okay.
+        if (error.code !== '23505') { // 23505 is unique_violation
+            console.error('Error setting cached content:', error);
+        }
+    }
+};
