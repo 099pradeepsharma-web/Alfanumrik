@@ -9,7 +9,8 @@ import Spinner from './Spinner';
 import ProgressBar from './ProgressBar';
 import TutorChat from './TutorChat';
 import ContentRenderer from './ContentRenderer';
-import { MessageSquareHeart, Edit, FileText, X, BookCopy } from 'lucide-react';
+import { MessageSquareHeart, Edit, FileText, X, BookCopy, ChevronDown } from 'lucide-react';
+import { LEARNING_TOPICS } from '../constants';
 
 const EXAM_TOPICS = ['Mathematics', 'Science', 'Social Studies', 'English', 'Hindi', 'Computer Science', 'General Knowledge'];
 const QUESTIONS_PER_EXAM = 5;
@@ -73,6 +74,10 @@ const ExamMode: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isTutorChatOpen, setIsTutorChatOpen] = useState(false);
+
+  // New state for topic selection UI
+  const [activeSelectionType, setActiveSelectionType] = useState<'quiz' | 'writing' | null>(null);
+  const [selectedSubjectName, setSelectedSubjectName] = useState<string | null>(null);
 
   // New state for summary
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
@@ -199,40 +204,85 @@ const ExamMode: React.FC = () => {
     setEssayText('');
     setFeedback(null);
     setError(null);
+    // Reset new state
+    setActiveSelectionType(null);
+    setSelectedSubjectName(null);
     setIsSummaryModalOpen(false);
     setSummaryText(null);
   };
-  
-  const renderSelectionScreen = () => (
-    <div className="max-w-4xl mx-auto text-center">
-        <h2 className="text-3xl font-bold">{t('exam_mode')}</h2>
-        <p className="text-slate-500 mt-2">Test your knowledge and practice your skills!</p>
-        <div className="mt-8 grid md:grid-cols-2 gap-6">
-            {/* Topic Selection for Quiz */}
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6">
-                <FileText className="h-12 w-12 text-indigo-500 mb-4 mx-auto" />
-                <h3 className="font-semibold text-xl">Multiple Choice Quiz</h3>
-                <p className="text-sm text-slate-500 mt-1 mb-4">Select a subject to start a quiz.</p>
-                <div className="space-y-2">
-                    {EXAM_TOPICS.slice(0, 4).map(t => (
-                        <button key={t} onClick={() => startQuiz(t)} className="w-full p-2 bg-slate-100 dark:bg-slate-700 rounded-md interactive-card hover:bg-indigo-100 dark:hover:bg-slate-600 btn-pressable">{t}</button>
+
+  const handleSubjectSelect = (subjectName: string, type: 'quiz' | 'writing') => {
+      if (selectedSubjectName === subjectName && activeSelectionType === type) {
+          setSelectedSubjectName(null);
+          setActiveSelectionType(null);
+      } else {
+          setSelectedSubjectName(subjectName);
+          setActiveSelectionType(type);
+      }
+  };
+
+  const renderSelectionScreen = () => {
+    const subjectsForClass = userProgress ? LEARNING_TOPICS[userProgress.classLevel] || [] : [];
+
+    const renderTopicSelector = (type: 'quiz' | 'writing') => {
+      return (
+        <div className="space-y-2">
+          {EXAM_TOPICS.map(subjectName => {
+            const subjectData = subjectsForClass.find(s => s.name === subjectName);
+            if (!subjectData || subjectData.topics.length === 0) return null;
+
+            const isExpanded = activeSelectionType === type && selectedSubjectName === subjectName;
+
+            return (
+              <div key={`${type}-${subjectName}`}>
+                <button
+                  onClick={() => handleSubjectSelect(subjectName, type)}
+                  className="w-full flex justify-between items-center text-left p-3 bg-slate-100 dark:bg-slate-700 rounded-md interactive-card hover:bg-indigo-100 dark:hover:bg-slate-600 btn-pressable"
+                >
+                  <span>{subjectName}</span>
+                  <ChevronDown className={`h-5 w-5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                </button>
+                {isExpanded && (
+                  <div className="animate-fade-in mt-1 pl-6 pr-2 py-2 space-y-2 border-l-2 border-indigo-200 dark:border-indigo-800">
+                    {subjectData.topics.map(topic => (
+                      <button
+                        key={topic.id}
+                        onClick={() => type === 'quiz' ? startQuiz(topic.name) : startWritingPractice(topic.name)}
+                        className="w-full text-left text-sm p-2 rounded-md text-slate-700 dark:text-slate-300 hover:bg-indigo-100 dark:hover:bg-slate-600 btn-pressable"
+                      >
+                        {topic.name}
+                      </button>
                     ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      );
+    };
+
+    return (
+        <div className="max-w-4xl mx-auto text-center">
+            <h2 className="text-3xl font-bold">{t('exam_mode')}</h2>
+            <p className="text-slate-500 mt-2">Test your knowledge and practice your skills!</p>
+            <div className="mt-8 grid md:grid-cols-2 gap-6">
+                <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6">
+                    <FileText className="h-12 w-12 text-indigo-500 mb-4 mx-auto" />
+                    <h3 className="font-semibold text-xl">Multiple Choice Quiz</h3>
+                    <p className="text-sm text-slate-500 mt-1 mb-4">Select a subject to see available topics.</p>
+                    {renderTopicSelector('quiz')}
                 </div>
-            </div>
-            {/* Topic Selection for Writing */}
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6">
-                <Edit className="h-12 w-12 text-teal-500 mb-4 mx-auto" />
-                <h3 className="font-semibold text-xl">Writing Practice</h3>
-                <p className="text-sm text-slate-500 mt-1 mb-4">Get an essay prompt and AI feedback.</p>
-                 <div className="space-y-2">
-                    {EXAM_TOPICS.slice(0, 4).map(t => (
-                        <button key={t} onClick={() => startWritingPractice(t)} className="w-full p-2 bg-slate-100 dark:bg-slate-700 rounded-md interactive-card hover:bg-teal-100 dark:hover:bg-slate-600 btn-pressable">{t}</button>
-                    ))}
+                <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6">
+                    <Edit className="h-12 w-12 text-teal-500 mb-4 mx-auto" />
+                    <h3 className="font-semibold text-xl">Writing Practice</h3>
+                    <p className="text-sm text-slate-500 mt-1 mb-4">Select a subject to get a prompt.</p>
+                    {renderTopicSelector('writing')}
                 </div>
             </div>
         </div>
-    </div>
-  );
+    );
+  };
 
   const renderQuizMode = () => {
     if (isLoading) {

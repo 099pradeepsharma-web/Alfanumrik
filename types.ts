@@ -95,3 +95,28 @@ export interface Subject {
   icon: string;
   topics: Topic[];
 }
+
+// New types for structured chapter content
+export interface CoreConcept {
+  title: string;
+  explanation: string;
+  example: string;
+}
+
+export interface InteractiveSimulation {
+  type: 'math_graph' | 'science_experiment' | 'timeline' | 'other';
+  title: string;
+  description: string;
+  parameters: any; 
+}
+
+export interface ChapterContent {
+  id: string;
+  topic: string;
+  classLevel: string;
+  learningObjectives: string[];
+  coreConcepts: CoreConcept[];
+  interactiveSimulation: InteractiveSimulation;
+  practiceProblems: Question[];
+  quickSummary: string;
+}

@@ -14,6 +14,19 @@ const toSnakeCase = (obj: Record<string, any>): Record<string, any> => {
     return newObj;
 };
 
+// Utility to convert snake_case object keys from Supabase to camelCase for the app
+const fromSnakeCase = (obj: Record<string, any>): Record<string, any> => {
+    if (!obj) return obj;
+    const newObj: Record<string, any> = {};
+    for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+            const camelKey = key.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+            newObj[camelKey] = obj[key];
+        }
+    }
+    return newObj;
+};
+
 
 /**
  * Fetches a user's profile from the 'profiles' table.
@@ -39,7 +52,7 @@ export const getUserProfile = async (uid: string): Promise<User | null> => {
         return null;
     }
     
-    return data as User | null;
+    return data ? fromSnakeCase(data) as User : null;
 };
 
 /**
@@ -135,7 +148,7 @@ export const updateUserProfile = async (uid: string, updates: Partial<User>): Pr
         throw new Error('Could not update user profile.');
     }
     
-    return data as User | null;
+    return data ? fromSnakeCase(data) as User : null;
 };
 
 /**
@@ -169,7 +182,7 @@ export const getStudentsForTeacher = async (teacherId: string): Promise<User[]> 
         return [];
     }
     
-    return students as User[];
+    return students ? students.map(s => fromSnakeCase(s) as User) : [];
 };
 
 /**
@@ -202,7 +215,7 @@ export const getChildrenForParent = async (parentId: string): Promise<User[]> =>
         return [];
     }
 
-    return children as User[];
+    return children ? children.map(c => fromSnakeCase(c) as User) : [];
 };
 
 export const submitFeedback = async (userId: string, rating: number, comments: string): Promise<void> => {

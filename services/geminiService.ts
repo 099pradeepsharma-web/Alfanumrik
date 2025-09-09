@@ -1,6 +1,6 @@
 // Fix: Added full content for geminiService.ts
 import { GoogleGenAI, Type } from "@google/genai";
-import type { LearningContent, Question, Topic } from '../types';
+import type { ChapterContent, Question, Topic } from '../types';
 import { getCachedContent, setCachedContent } from './databaseService';
 
 if (!process.env.API_KEY) {
@@ -41,36 +41,40 @@ function handleGeminiError(error: unknown, context: string): Error {
     return new Error(`Sorry, an unexpected error occurred while ${context}. If this continues, please try again later.`);
 }
 
-export async function generateLearningContent(topicId: string, topicName: string, classLevel: string): Promise<LearningContent> {
-    const cacheKey = `learning_content::${topicId}::${classLevel}`;
+export async function generateChapterContent(topicId: string, topicName: string, classLevel: string): Promise<ChapterContent> {
+    const cacheKey = `chapter_content_v2::${topicId}::${classLevel}`;
     try {
         const cachedContent = await getCachedContent(cacheKey);
         if (cachedContent) {
-            console.log("Cache hit for learning content:", cacheKey);
-            return cachedContent as LearningContent;
+            console.log("Cache hit for chapter content:", cacheKey);
+            return cachedContent as ChapterContent;
         }
 
-        console.log("Cache miss for learning content:", cacheKey);
-        const prompt = `You are an expert educator specializing in the Indian CBSE curriculum.
-Generate a concise and engaging learning module on the topic "${topicName}" for a Class ${classLevel} student.
+        console.log("Cache miss for chapter content:", cacheKey);
+        const prompt = `You are an expert CBSE curriculum assistant. Your task is to generate a complete, structured learning chapter for a Class ${classLevel} student on the topic "${topicName}".
 
-Your response MUST be a single, valid JSON object with the following fields:
-- "id": A unique string ID for this content. Use the value "${topicId}".
-- "topic": The name of the topic. Use the value "${topicName}".
-- "difficulty": A string indicating the topic's difficulty for this class level. Must be one of: 'easy', 'medium', or 'hard'.
-- "content": A string containing the main learning text.
-- "imagePrompts": An array of 1-2 strings, each a detailed AI image generator prompt.
+The output MUST be a single, valid JSON object. Use simple, conversational language suitable for the target class level. Break down complex concepts with real-world analogies relevant to India.
 
-Details for "content":
-- It must be **CBSE-Aligned** for Class ${classLevel}.
-- Use **simple language**, analogies, and real-world examples relevant to an Indian student.
-- Use markdown for structure (### for headings, **bold** for key terms, lists).
-- Incorporate clear, text-based diagrams (ASCII art) where appropriate.
-
-Details for "imagePrompts":
-- Each prompt must be highly detailed and suggest a visual style (e.g., 'clear diagram', 'realistic photograph').
-- Example for Photosynthesis: "A detailed diagram of photosynthesis in a plant cell. Style: educational illustration. Key elements: chloroplast, sunlight, water, carbon dioxide, oxygen, and glucose, with arrows showing the process flow."
-`;
+The JSON object must have the following structure:
+- "id": "${topicId}"
+- "topic": "${topicName}"
+- "classLevel": "${classLevel}"
+- "learningObjectives": An array of 3-4 simple, clear learning goals (e.g., "Understand what a fraction is.").
+- "coreConcepts": An array of 2-3 core concept objects. Each object must have:
+    - "title": The name of the concept.
+    - "explanation": A simple breakdown of the concept.
+    - "example": A real-world, everyday example.
+- "interactiveSimulation": An object describing a dynamic simulation for an abstract concept from the topic. It must have:
+    - "type": A string, one of 'math_graph', 'science_experiment', 'timeline', or 'other'.
+    - "title": A clear title for the simulation.
+    - "description": A brief explanation of what the simulation demonstrates.
+    - "parameters": An object with data for the simulation.
+        - For 'science_experiment': { "materials": string[], "steps": string[], "observation": string }
+        - For 'math_graph': { "description": "A description of a simple function and its graph", "equation": "e.g., y = x^2", "key_points": "e.g., a parabola opening upwards with vertex at (0,0)" }
+        - For 'timeline': { "events": Array<{ year: string; description: string }> }
+        - For 'other': { "text": "Describe the interactive element." }
+- "practiceProblems": An array of 2-3 multiple-choice questions to check understanding. Each question object must have "id", "questionText", "options" (array of 4 strings), "correctAnswer", "explanation", and "topic" ("${topicName}").
+- "quickSummary": A concise summary of the chapter's key points in markdown format.`;
 
         const response = await ai.models.generateContent({
             model,
@@ -80,49 +84,89 @@ Details for "imagePrompts":
                 responseSchema: {
                     type: Type.OBJECT,
                     properties: {
-                        id: { type: Type.STRING, description: "A unique ID for the content" },
-                        topic: { type: Type.STRING, description: "The topic of the content" },
-                        content: { type: Type.STRING, description: "The main learning content, formatted with diagrams and lists." },
-                        difficulty: { type: Type.STRING, description: "The difficulty level" },
-                        imagePrompts: {
+                        id: { type: Type.STRING },
+                        topic: { type: Type.STRING },
+                        classLevel: { type: Type.STRING },
+                        learningObjectives: { type: Type.ARRAY, items: { type: Type.STRING } },
+                        coreConcepts: {
                             type: Type.ARRAY,
-                            items: { type: Type.STRING },
-                            description: "An array of 1-2 text prompts for an AI image generator."
-                        }
+                            items: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    title: { type: Type.STRING },
+                                    explanation: { type: Type.STRING },
+                                    example: { type: Type.STRING },
+                                },
+                                required: ["title", "explanation", "example"]
+                            }
+                        },
+                        interactiveSimulation: {
+                            type: Type.OBJECT,
+                            properties: {
+                                type: { type: Type.STRING },
+                                title: { type: Type.STRING },
+                                description: { type: Type.STRING },
+                                parameters: {
+                                    type: Type.OBJECT,
+                                    properties: {
+                                        materials: { type: Type.ARRAY, items: { type: Type.STRING } },
+                                        steps: { type: Type.ARRAY, items: { type: Type.STRING } },
+                                        observation: { type: Type.STRING },
+                                        description: { type: Type.STRING },
+                                        equation: { type: Type.STRING },
+                                        key_points: { type: Type.STRING },
+                                        events: {
+                                            type: Type.ARRAY,
+                                            items: {
+                                                type: Type.OBJECT,
+                                                properties: {
+                                                    year: { type: Type.STRING },
+                                                    description: { type: Type.STRING }
+                                                },
+                                                required: ['year', 'description']
+                                            }
+                                        },
+                                        text: { type: Type.STRING }
+                                    }
+                                }
+                            },
+                            required: ["type", "title", "description", "parameters"]
+                        },
+                        practiceProblems: {
+                            type: Type.ARRAY,
+                            items: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    id: { type: Type.STRING },
+                                    questionText: { type: Type.STRING },
+                                    options: { type: Type.ARRAY, items: { type: Type.STRING } },
+                                    correctAnswer: { type: Type.STRING },
+                                    explanation: { type: Type.STRING },
+                                    topic: { type: Type.STRING },
+                                },
+                                required: ["id", "questionText", "options", "correctAnswer", "explanation", "topic"]
+                            }
+                        },
+                        quickSummary: { type: Type.STRING }
                     },
-                    required: ["id", "topic", "content", "difficulty", "imagePrompts"]
+                    required: ["id", "topic", "classLevel", "learningObjectives", "coreConcepts", "interactiveSimulation", "practiceProblems", "quickSummary"]
                 }
             }
         });
 
-        const responseText = response.text?.trim();
-        if (!responseText) {
-            console.error("Gemini API returned an empty response for learning content.");
-            throw new Error("Failed to generate learning content: the AI returned an empty response.");
-        }
-
-        
-        // Sanitize the response to handle potential markdown code blocks
-        let jsonString = responseText;
-        if (jsonString.startsWith("```json")) {
-            jsonString = jsonString.substring(7, jsonString.length - 3).trim();
-        } else if (jsonString.startsWith("```")) {
-            jsonString = jsonString.substring(3, jsonString.length - 3).trim();
-        }
-
+        const jsonString = response.text.trim();
         const json = JSON.parse(jsonString);
-        const finalContent = { ...json, topicId: topicId } as LearningContent;
         
-        // Asynchronously cache the result
-        setCachedContent(cacheKey, 'learning_content', finalContent).catch(err => {
-            console.error("Failed to cache learning content:", err);
+        setCachedContent(cacheKey, 'chapter_content_v2', json).catch(err => {
+            console.error("Failed to cache chapter content:", err);
         });
         
-        return finalContent;
+        return json as ChapterContent;
     } catch (error) {
-        throw handleGeminiError(error, 'generating your lesson');
+        throw handleGeminiError(error, 'generating your chapter lesson');
     }
 }
+
 
 export async function generateQuiz(topic: string, numberOfQuestions: number, classLevel: string): Promise<Question[]> {
     const cacheKey = `quiz::${topic.replace(/\s+/g, '_')}::${classLevel}::${numberOfQuestions}`;
@@ -456,7 +500,7 @@ Your feedback must be:
 2.  **Structured:** Organize feedback into clear sections using markdown headings (e.g., ### Clarity and Structure, ### Grammar and Spelling, ### Suggestions for Improvement).
 3.  **Actionable:** Provide specific examples from the student's text to illustrate your points.
 4.  **Concise:** Keep the feedback focused and easy to digest.
-5.  **Appropriate:** The tone and complexity of the feedback should be suitable for a Class ${classLevel} student.
+5.  **AppropriATE:** The tone and complexity of the feedback should be suitable for a Class ${classLevel} student.
 
 End with an encouraging summary.`;
 
