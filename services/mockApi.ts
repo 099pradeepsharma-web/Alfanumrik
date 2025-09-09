@@ -263,3 +263,14 @@ export const getChildrenForParent = async (parentId: string): Promise<User[]> =>
     }
     return [];
 };
+
+export const mockSubmitFeedback = async (userId: string, rating: number, comments: string): Promise<void> => {
+    await new Promise(res => setTimeout(res, 500)); // Simulate network delay
+    console.log("--- MOCK FEEDBACK SUBMITTED ---");
+    console.log("User ID:", userId);
+    console.log("Rating:", rating);
+    console.log("Comments:", comments);
+    console.log("-------------------------------");
+    // In mock mode, we just resolve successfully.
+    return;
+};

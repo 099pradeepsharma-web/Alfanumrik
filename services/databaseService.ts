@@ -197,3 +197,22 @@ export const getChildrenForParent = async (parentId: string): Promise<User[]> =>
 
     return children as User[];
 };
+
+export const submitFeedback = async (userId: string, rating: number, comments: string): Promise<void> => {
+    if (isUsingMocks) {
+        return mockApi.mockSubmitFeedback(userId, rating, comments);
+    }
+
+    const { error } = await supabase
+        .from('feedback')
+        .insert({
+            user_id: userId,
+            rating: rating || null, // Allow null rating if only comments are provided
+            comments: comments || null,
+        });
+    
+    if (error) {
+        console.error('Error submitting feedback:', error);
+        throw new Error('Could not submit feedback.');
+    }
+};
