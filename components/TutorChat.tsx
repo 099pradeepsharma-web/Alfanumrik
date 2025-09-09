@@ -6,13 +6,14 @@ import { Send, X, Mic, Video, VideoOff, MicOff } from 'lucide-react';
 import { useAppContext } from '../contexts/AppContext';
 import { useLocalization } from '../hooks/useLocalization';
 import { speak } from '../services/speechService';
+import { LEARNING_TOPICS } from '../constants';
 
 interface TutorChatProps {
     onClose: () => void;
 }
 
 const TutorChat: React.FC<TutorChatProps> = ({ onClose }) => {
-    const { currentUser } = useAppContext();
+    const { currentUser, selectedTopicId } = useAppContext();
     const { currentLang } = useLocalization();
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
@@ -156,6 +157,16 @@ const TutorChat: React.FC<TutorChatProps> = ({ onClose }) => {
         setMessages([{ sender: 'tutor', text: greetingText }]);
         speak(greetingText, currentLang);
         
+        let currentTopicInfo = '';
+        if (selectedTopicId && currentUser?.classLevel) {
+          const subjects = LEARNING_TOPICS[currentUser.classLevel] || [];
+          const allTopics = subjects.flatMap(s => s.topics.map(t => ({...t, subjectName: s.name})));
+          const currentTopic = allTopics.find(t => t.id === selectedTopicId);
+          if (currentTopic) {
+            currentTopicInfo = `The student is currently studying the topic "${currentTopic.name}" in the subject of ${currentTopic.subjectName}. Tailor your explanations and examples to this topic if relevant to the conversation.`;
+          }
+        }
+
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
         chatRef.current = ai.chats.create({
             model: 'gemini-2.5-flash',
@@ -164,9 +175,10 @@ const TutorChat: React.FC<TutorChatProps> = ({ onClose }) => {
             ],
             config: {
                 systemInstruction: `Your name is Alfa. You are a friendly, patient, and encouraging AI tutor for a K-12 student in India using the CBSE curriculum.
-                The student you are tutoring is named ${currentUser.name}. Always address them by their name.
+                The student you are tutoring is named ${currentUser.name} and is in Class ${currentUser.classLevel}. Always address them by their name.
+                ${currentTopicInfo}
                 Your goal is to guide the student to the correct answer, not just provide it.
-                - When asked a question, break down the concept into simple, easy-to-understand steps.
+                - When asked a question, break down the concept into simple, easy-to-understand steps appropriate for their class level.
                 - Use real-world analogies relevant to an Indian student.
                 - Use Indian English phrasing where natural and appropriate (e.g., use "lakhs" and "crores" for large numbers).
                 - After explaining a concept, ask a follow-up question to check for understanding.
@@ -186,7 +198,7 @@ const TutorChat: React.FC<TutorChatProps> = ({ onClose }) => {
                 window.speechSynthesis.cancel();
             }
         };
-    }, [currentUser, currentLang]);
+    }, [currentUser, currentLang, selectedTopicId]);
 
     const toggleCamera = async () => {
         if (isCameraOn) {

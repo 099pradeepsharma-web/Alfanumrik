@@ -43,7 +43,8 @@ export const getUserProfile = async (uid: string): Promise<User | null> => {
 };
 
 /**
- * Creates a new user profile document in the 'profiles' table after signup.
+ * Creates a new user profile by calling a remote procedure in Supabase.
+ * This is designed to work with Row-Level Security (RLS).
  * @param uid The new user's UID from Supabase Auth.
  * @param details An object containing the user's details.
  */
@@ -53,33 +54,39 @@ export const createUserProfile = async (uid: string, details: { name: string; em
         return;
     }
     
-    const profileData: Partial<User> = {
+    // Construct the full profile based on the User type, initializing all relevant fields.
+    const profileData = {
         id: uid,
         email: details.email,
         name: details.name,
         role: details.role,
         verified: true, // Assuming email verification is handled by Supabase Auth
+        level: details.role === 'student' ? 1 : null,
+        points: details.role === 'student' ? 0 : null,
+        classLevel: details.role === 'student' ? details.classLevel || '6' : null,
+        badges: details.role === 'student' ? [] : null,
+        dailyChallengeCompleted: details.role === 'student' ? false : null,
+        completedTopics: details.role === 'student' ? [] : null,
+        weaknesses: details.role === 'student' ? [] : null,
+        strengths: details.role === 'student' ? [] : null,
+        lastActivity: new Date().toISOString(),
+        students: details.role === 'teacher' ? [] : null,
+        children: details.role === 'parent' ? [] : null,
     };
 
-    if (details.role === 'student') {
-        profileData.level = 1;
-        profileData.points = 0;
-        profileData.classLevel = details.classLevel || '6';
-        profileData.completedTopics = [];
-        profileData.badges = [];
-        profileData.dailyChallengeCompleted = false;
-        profileData.lastActivity = new Date().toISOString();
-        profileData.weaknesses = [];
-        profileData.strengths = [];
-    }
-
-    const { error } = await supabase.from('profiles').insert(toSnakeCase(profileData));
+    // We're switching to an RPC call to a function that can bypass RLS for the initial insert.
+    // This assumes the user has a function `create_user_profile(profile_data jsonb)` in their database.
+    // The RPC function will expect snake_case keys matching the database columns.
+    const { error } = await supabase.rpc('create_user_profile', {
+      profile_data: toSnakeCase(profileData)
+    });
     
     if (error) {
-        console.error('Error creating user profile:', error);
-        throw new Error('Could not create user profile.');
+        console.error('Error creating user profile via RPC:', error);
+        throw new Error('Could not create user profile. Please ensure the backend is configured correctly.');
     }
 };
+
 
 /**
  * Updates a student's progress in their profile document.

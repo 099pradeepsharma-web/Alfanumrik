@@ -52,9 +52,23 @@ const Notification: React.FC<NotificationProps> = ({ message, icon, onClose }) =
 const AppContent: React.FC = () => {
     const { view, currentUser, notification, dismissNotification, login, logout } = useAppContext();
     const [isAuthLoading, setIsAuthLoading] = useState(true);
+    const [isFileSystem, setIsFileSystem] = useState(false);
+
+    // Check if the app is running from the file system, which causes API errors.
+    useEffect(() => {
+        if (window.location.protocol === 'file:') {
+            setIsFileSystem(true);
+        }
+    }, []);
 
     // Set up a real-time listener for authentication state
     useEffect(() => {
+        // Prevent auth calls if running from file system, as they will fail.
+        if (isFileSystem) {
+            setIsAuthLoading(false);
+            return;
+        }
+
         const unsubscribe = authService.onAuthUserChanged(user => {
             if (user) {
                 login(user);
@@ -66,7 +80,31 @@ const AppContent: React.FC = () => {
 
         // Cleanup subscription on unmount
         return () => unsubscribe();
-    }, [login, logout]);
+    }, [login, logout, isFileSystem]);
+
+    // Render an instructional overlay if the app is opened as a local file.
+    if (isFileSystem) {
+        return (
+            <div className="fixed inset-0 bg-slate-900 text-white flex flex-col justify-center items-center p-8 z-[100]">
+                <h1 className="text-3xl font-bold text-amber-400 mb-4">Development Server Required</h1>
+                <p className="text-lg text-center max-w-2xl mb-6">
+                    This application needs to be run on a local web server to work correctly. Opening the <code>index.html</code> file directly causes "Failed to fetch" errors with API requests.
+                </p>
+                <div className="bg-slate-800 p-6 rounded-lg text-left w-full max-w-xl">
+                    <h2 className="text-xl font-semibold mb-3">How to Fix This:</h2>
+                    <p className="mb-4">If you have Node.js and npm installed, you can use this simple command:</p>
+                    <ol className="list-decimal list-inside space-y-2 text-slate-300">
+                        <li>Open a terminal or command prompt in the project's folder.</li>
+                        <li>Run the command: <code className="bg-slate-900 text-green-400 px-2 py-1 rounded">npx serve</code></li>
+                        <li>Open the URL it provides (e.g., <code className="bg-slate-900 text-green-400 px-2 py-1 rounded">http://localhost:3000</code>) in your browser.</li>
+                    </ol>
+                </div>
+                 <p className="mt-6 text-sm text-slate-400">
+                    Using a local server resolves browser security policies (CORS) that block API calls from <code>file://</code> pages.
+                </p>
+            </div>
+        );
+    }
 
     const renderView = () => {
         if (isAuthLoading) {
