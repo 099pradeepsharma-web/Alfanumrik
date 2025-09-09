@@ -11,29 +11,29 @@ export const signup = async (details: { name: string; email: string; password: s
         return mockApi.mockSignup(details);
     }
 
-    const { email, password, ...profileDetails } = details;
+    const { email, password, name, role, classLevel } = details;
+    // Store user-selected details in metadata, so we can access it later
+    // to create the profile with the correct role.
     const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+            data: {
+                full_name: name,
+                app_role: role,
+                class_level: role === 'student' ? classLevel : null,
+            }
+        }
     });
 
     if (error) {
         return { success: false, error: error.message };
     }
     
-    // If signup is successful, create a corresponding user profile
-    if (data.user) {
-        try {
-            await createUserProfile(data.user.id, details);
-            return { success: true };
-        } catch (profileError: any) {
-            // This is a tricky state. The user is created in auth, but profile failed.
-            // For a real app, you might want to handle this more gracefully (e.g., delete the auth user or queue a retry).
-            return { success: false, error: profileError.message };
-        }
-    }
-
-    return { success: false, error: 'An unknown error occurred during signup.' };
+    // IMPORTANT: Profile creation is now handled by onAuthUserChanged.
+    // This makes the flow resilient to email confirmation requirements, as the
+    // profile is only created when the user has a valid session for the first time.
+    return { success: true };
 };
 
 export const login = async (email: string, password: string): Promise<{ success: boolean, error?: string }> => {
@@ -83,6 +83,8 @@ export const logout = async (): Promise<void> => {
 /**
  * Sets up a listener for authentication state changes.
  * When a user logs in, it fetches their full profile from the database.
+ * If a profile doesn't exist (e.g., first-time login), it creates one
+ * using metadata from the auth user record.
  * @param callback The function to call with the full User object (or null).
  * @returns An unsubscribe function to detach the listener.
  */
@@ -95,10 +97,43 @@ export const onAuthUserChanged = (callback: (user: User | null) => void): (() =>
         if (session?.user) {
             try {
                 // User is logged in, fetch their full profile
-                const userProfile = await getUserProfile(session.user.id);
+                let userProfile = await getUserProfile(session.user.id);
+                
+                // If profile doesn't exist, it's a new user. Create one.
+                if (!userProfile) {
+                    console.log(`No profile found for user ${session.user.id}. Creating a new profile.`);
+                    
+                    if (!session.user.email) {
+                        throw new Error("Cannot create profile for user without an email address.");
+                    }
+
+                    // Read role and classLevel from metadata set during signup.
+                    // Provide defaults for OAuth users or other edge cases.
+                    const roleFromMeta = session.user.user_metadata?.app_role || 'student';
+                    const classLevelFromMeta = session.user.user_metadata?.class_level || '6';
+
+                    const newUserDetails = {
+                        name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email,
+                        email: session.user.email,
+                        role: roleFromMeta as Role,
+                        classLevel: classLevelFromMeta,
+                    };
+
+                    await createUserProfile(session.user.id, newUserDetails);
+
+                    // Fetch the newly created profile to ensure we have the complete data
+                    userProfile = await getUserProfile(session.user.id);
+
+                    if (!userProfile) {
+                        throw new Error("Failed to retrieve profile after creation. Please contact support.");
+                    }
+                }
+
                 callback(userProfile);
             } catch (error) {
-                console.error("Error fetching user profile:", error);
+                console.error("Error handling auth state change:", error);
+                // Log out the user if profile creation/fetching fails catastrophically
+                await logout(); 
                 callback(null);
             }
         } else {
