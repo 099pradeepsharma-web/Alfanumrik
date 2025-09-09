@@ -87,6 +87,15 @@ const TutorChat: React.FC<TutorChatProps> = ({ onClose }) => {
             
             recognition.onerror = (event: any) => {
                 console.error("Speech recognition error", event.error);
+                if (event.error === 'network') {
+                    alert("Speech recognition failed. Please check your internet connection and try again.");
+                } else if (event.error === 'no-speech') {
+                    alert("I didn't hear anything. Please try speaking again.");
+                } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                    alert("Microphone access was denied. Please enable it in your browser settings to use voice input.");
+                } else {
+                    alert(`An unexpected speech recognition error occurred: ${event.error}`);
+                }
                 setIsListening(false);
             };
 
@@ -185,7 +194,7 @@ const TutorChat: React.FC<TutorChatProps> = ({ onClose }) => {
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-lg h-[80vh] flex flex-col m-4 animate-slide-in-up">
                 <header className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700">
                     <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">Alfa, Your AI Tutor</h3>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-full p-1 focus:outline-none focus:ring-2 focus:ring-slate-400" aria-label="Close chat">
+                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-full p-1 focus:outline-none focus:ring-2 focus:ring-slate-400 btn-pressable" aria-label="Close chat">
                         <X className="h-6 w-6" />
                     </button>
                 </header>
@@ -197,7 +206,7 @@ const TutorChat: React.FC<TutorChatProps> = ({ onClose }) => {
                         </div>
                     )}
                     {messages.map((msg, index) => (
-                        <div key={index} className={`flex items-end gap-2 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div key={index} className={`flex items-end gap-2 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}>
                             {msg.sender === 'tutor' && <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">A</div>}
                             <div className={`max-w-xs md:max-w-md p-3 rounded-2xl ${msg.sender === 'user'
                                 ? 'bg-indigo-600 text-white rounded-br-none'
@@ -223,7 +232,7 @@ const TutorChat: React.FC<TutorChatProps> = ({ onClose }) => {
                         <button
                             type="button"
                             onClick={toggleListen}
-                            className={`p-3 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors ${
+                            className={`p-3 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors btn-pressable ${
                                 isListening ? 'text-red-500' : 'text-slate-500'
                             }`}
                             aria-label={isListening ? 'Stop listening' : 'Start listening'}
@@ -233,7 +242,7 @@ const TutorChat: React.FC<TutorChatProps> = ({ onClose }) => {
                         <button
                             type="button"
                             onClick={toggleCamera}
-                            className={`p-3 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors ${
+                            className={`p-3 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors btn-pressable ${
                                 isCameraOn ? 'text-indigo-500' : 'text-slate-500'
                             }`}
                              aria-label={isCameraOn ? 'Turn off camera' : 'Turn on camera'}
@@ -251,7 +260,7 @@ const TutorChat: React.FC<TutorChatProps> = ({ onClose }) => {
                         <button
                             type="submit"
                             disabled={isLoading || !input.trim()}
-                            className="p-3 bg-indigo-600 text-white rounded-full shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400"
+                            className="p-3 bg-indigo-600 text-white rounded-full shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 btn-pressable"
                             aria-label="Send message"
                         >
                             <Send className="h-5 w-5" />

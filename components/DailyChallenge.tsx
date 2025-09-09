@@ -1,5 +1,4 @@
-// Fix: Added full content for DailyChallenge.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { generateQuiz } from '../services/geminiService';
 import { speak } from '../services/speechService';
@@ -8,40 +7,58 @@ import type { Question, UserProgress } from '../types';
 import Spinner from './Spinner';
 
 const DailyChallenge: React.FC = () => {
-    const { userProgress, updateProgress, showNotification } = useAppContext();
+    const { 
+        userProgress, 
+        updateProgress, 
+        showNotification,
+        dailyChallenge,
+        setDailyChallenge,
+        dailyChallengeFetched,
+        setDailyChallengeFetched,
+    } = useAppContext();
     const { currentLang } = useLocalization();
-    const [challenge, setChallenge] = useState<Question | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(!dailyChallengeFetched && !userProgress?.dailyChallengeCompleted);
     const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
-    const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const fetchingRef = useRef(false);
 
     useEffect(() => {
         const fetchChallenge = async () => {
-            if (userProgress?.dailyChallengeCompleted) {
+            if (userProgress?.dailyChallengeCompleted || dailyChallengeFetched || fetchingRef.current) {
                 setIsLoading(false);
                 return;
             }
+            
+            fetchingRef.current = true;
+            setIsLoading(true);
+            setError(null);
+
             try {
                 const classLevel = userProgress?.classLevel || '6';
                 const questions = await generateQuiz("a random fun fact", 1, classLevel);
                 if (questions.length > 0) {
-                    setChallenge(questions[0]);
+                    setDailyChallenge(questions[0]);
+                } else {
+                    throw new Error("The AI did not return a question for the challenge.");
                 }
-            } catch (error) {
-                console.error("Failed to fetch daily challenge", error);
+            } catch (err) {
+                console.error("Failed to fetch daily challenge", err);
+                const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
+                setError(errorMessage);
+                setDailyChallenge(null);
             } finally {
+                setDailyChallengeFetched(true);
                 setIsLoading(false);
             }
         };
 
         fetchChallenge();
-    }, [userProgress?.dailyChallengeCompleted, userProgress?.classLevel]);
+    }, [userProgress, dailyChallengeFetched, setDailyChallenge, setDailyChallengeFetched]);
 
     const handleAnswer = (answer: string) => {
-        if (!challenge || !userProgress) return;
+        if (!dailyChallenge || !userProgress) return;
         setSelectedAnswer(answer);
-        const correct = answer === challenge.correctAnswer;
-        setIsCorrect(correct);
+        const correct = answer === dailyChallenge.correctAnswer;
         
         if (correct) {
             const pointsEarned = 100;
@@ -86,8 +103,17 @@ const DailyChallenge: React.FC = () => {
             </div>
         );
     }
+
+    if (error) {
+        return (
+             <div className="bg-white dark:bg-slate-800 shadow-md rounded-lg p-6 text-center">
+                <h3 className="font-bold text-lg text-slate-700 dark:text-slate-200 mb-2">Daily Challenge Error</h3>
+                <p className="text-slate-500 dark:text-slate-400 px-4">{error}</p>
+            </div>
+        )
+    }
     
-    if (!challenge) {
+    if (!dailyChallenge) {
         return (
             <div className="bg-white dark:bg-slate-800 shadow-md rounded-lg p-6 text-center">
                 <h3 className="font-bold text-lg text-slate-700 dark:text-slate-200 mb-2">Daily Challenge</h3>
@@ -99,15 +125,19 @@ const DailyChallenge: React.FC = () => {
     return (
         <div className="bg-white dark:bg-slate-800 shadow-md rounded-lg p-6">
             <h3 className="font-bold text-lg text-slate-700 dark:text-slate-200 mb-4">Daily Challenge</h3>
-            <p className="font-semibold mb-4">{challenge.questionText}</p>
+            <p className="font-semibold mb-4">{dailyChallenge.questionText}</p>
             <div className="space-y-2">
-                {challenge.options.map(option => (
+                {dailyChallenge.options.map(option => (
                     <button key={option}
                         onClick={() => handleAnswer(option)}
                         disabled={!!selectedAnswer}
-                        className={`w-full text-left p-3 rounded-md border transition-colors ${
+                        className={`w-full text-left p-3 rounded-md border transition-colors btn-pressable ${
                             selectedAnswer
-                            ? (option === challenge.correctAnswer ? 'bg-green-100 dark:bg-green-900 border-green-400' : (option === selectedAnswer ? 'bg-red-100 dark:bg-red-900 border-red-400' : 'bg-slate-50 dark:bg-slate-700' ) )
+                            ? (option === dailyChallenge.correctAnswer 
+                                ? 'bg-green-100 dark:bg-green-900 border-green-400 animate-correct-pulse' 
+                                : (option === selectedAnswer 
+                                    ? 'bg-red-100 dark:bg-red-900 border-red-400 animate-shake' 
+                                    : 'bg-slate-50 dark:bg-slate-700' ) )
                             : 'bg-slate-100 dark:bg-slate-700 hover:bg-indigo-100 dark:hover:bg-slate-600 border-slate-300 dark:border-slate-600'
                         }`}
                     >
@@ -118,7 +148,7 @@ const DailyChallenge: React.FC = () => {
             {selectedAnswer && (
                  <div className="mt-4 p-4 bg-slate-100 dark:bg-slate-700 rounded-lg">
                     <h4 className="font-bold">Explanation</h4>
-                    <p className="text-sm mt-1">{challenge.explanation}</p>
+                    <p className="text-sm mt-1">{dailyChallenge.explanation}</p>
                  </div>
             )}
         </div>

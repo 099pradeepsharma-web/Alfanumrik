@@ -2,13 +2,14 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { useLocalization } from '../hooks/useLocalization';
-import { generateQuiz } from '../services/geminiService';
+import { generateQuiz, generateEssayPrompt, provideEssayFeedback } from '../services/geminiService';
 import { speak } from '../services/speechService';
 import type { Question } from '../types';
 import Spinner from './Spinner';
 import ProgressBar from './ProgressBar';
 import TutorChat from './TutorChat';
-import { MessageSquareHeart } from 'lucide-react';
+import ContentRenderer from './ContentRenderer';
+import { MessageSquareHeart, Edit, FileText } from 'lucide-react';
 
 const EXAM_TOPICS = ['Mathematics', 'Science', 'Social Studies', 'English', 'Hindi', 'Computer Science', 'General Knowledge'];
 const QUESTIONS_PER_EXAM = 5;
@@ -17,24 +18,33 @@ const ExamMode: React.FC = () => {
   const { userProgress, updateProgress, showNotification } = useAppContext();
   const { t, currentLang } = useLocalization();
 
+  const [mode, setMode] = useState<'selection' | 'quiz' | 'writing'>('selection');
   const [topic, setTopic] = useState<string | null>(null);
+  
+  // Quiz state
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [score, setScore] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
+
+  // Writing practice state
+  const [writingPrompt, setWritingPrompt] = useState<string | null>(null);
+  const [essayText, setEssayText] = useState('');
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
+  const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false);
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isTutorChatOpen, setIsTutorChatOpen] = useState(false);
 
-  const startExam = async (selectedTopic: string) => {
+  const startQuiz = async (selectedTopic: string) => {
     setTopic(selectedTopic);
     setIsLoading(true);
     setError(null);
     try {
-      if (!userProgress) {
-        throw new Error("User progress is not available");
-      }
+      if (!userProgress) throw new Error("User progress is not available");
       const quizQuestions = await generateQuiz(selectedTopic, QUESTIONS_PER_EXAM, userProgress.classLevel);
       setQuestions(quizQuestions);
       setCurrentQuestionIndex(0);
@@ -46,6 +56,42 @@ const ExamMode: React.FC = () => {
       console.error(e);
     } finally {
       setIsLoading(false);
+    }
+  };
+  
+  const startWritingPractice = async (selectedTopic: string) => {
+    setTopic(selectedTopic);
+    setIsGeneratingPrompt(true);
+    setError(null);
+    try {
+        if (!userProgress) throw new Error("User progress not available");
+        const prompt = await generateEssayPrompt(selectedTopic, userProgress.classLevel);
+        setWritingPrompt(prompt);
+    } catch (e) {
+        setError('Failed to generate a writing prompt. Please try again.');
+        console.error(e);
+    } finally {
+        setIsGeneratingPrompt(false);
+    }
+  };
+
+  const handleSubmitEssay = async () => {
+    if (!writingPrompt || !essayText.trim() || !userProgress) return;
+    setIsGeneratingFeedback(true);
+    setError(null);
+    try {
+        const generatedFeedback = await provideEssayFeedback(writingPrompt, essayText, userProgress.classLevel);
+        setFeedback(generatedFeedback);
+        
+        const pointsEarned = 150;
+        updateProgress({ points: userProgress.points + pointsEarned });
+        showNotification({ message: `Great work! You earned ${pointsEarned} points for completing the writing practice.`, icon: '✍️' });
+
+    } catch(e) {
+        setError('Sorry, we couldn\'t generate feedback for your essay right now.');
+        console.error(e);
+    } finally {
+        setIsGeneratingFeedback(false);
     }
   };
 
@@ -84,109 +130,220 @@ const ExamMode: React.FC = () => {
   };
 
   const resetExam = () => {
+    setMode('selection');
     setTopic(null);
     setQuestions([]);
+    setWritingPrompt(null);
+    setEssayText('');
+    setFeedback(null);
+    setError(null);
   };
-
-  if (isLoading) {
-    return <div className="flex justify-center mt-10"><Spinner text="Preparing your exam..." /></div>;
-  }
-
-  if (error) {
-    return <p className="text-center text-red-500 mt-10">{error}</p>;
-  }
-
-  if (!topic) {
-    return (
-      <div className="max-w-2xl mx-auto text-center">
+  
+  const renderSelectionScreen = () => (
+    <div className="max-w-2xl mx-auto text-center">
         <h2 className="text-3xl font-bold">{t('exam_mode')}</h2>
-        <p className="text-slate-500 mt-2">Test your knowledge and earn points!</p>
+        <p className="text-slate-500 mt-2">Test your knowledge and practice your skills!</p>
+        <div className="mt-8 grid md:grid-cols-2 gap-6">
+            <button 
+                onClick={() => setMode('quiz')} 
+                className="flex flex-col items-center justify-center p-8 bg-white dark:bg-slate-800 rounded-lg shadow-lg interactive-card hover:bg-indigo-50 dark:hover:bg-slate-700 transition-colors btn-pressable"
+            >
+                <FileText className="h-12 w-12 text-indigo-500 mb-4" />
+                <h3 className="font-semibold text-xl">Multiple Choice Quiz</h3>
+                <p className="text-sm text-slate-500 mt-1">Answer questions against the clock.</p>
+            </button>
+            <button 
+                onClick={() => setMode('writing')}
+                className="flex flex-col items-center justify-center p-8 bg-white dark:bg-slate-800 rounded-lg shadow-lg interactive-card hover:bg-teal-50 dark:hover:bg-slate-700 transition-colors btn-pressable"
+            >
+                <Edit className="h-12 w-12 text-teal-500 mb-4" />
+                <h3 className="font-semibold text-xl">Writing Practice</h3>
+                <p className="text-sm text-slate-500 mt-1">Get essay prompts and AI feedback.</p>
+            </button>
+        </div>
+    </div>
+  );
+
+  const renderTopicSelection = (onSelect: (topic: string) => void) => (
+      <div className="max-w-2xl mx-auto text-center">
+        <h2 className="text-3xl font-bold">Select a Subject</h2>
+        <p className="text-slate-500 mt-2">Choose a subject to begin your practice.</p>
         <div className="mt-6 grid gap-4">
           {EXAM_TOPICS.map(t => (
-            <button key={t} onClick={() => startExam(t)} className="w-full p-4 bg-white dark:bg-slate-800 rounded-lg shadow font-semibold text-lg interactive-card hover:bg-indigo-50 dark:hover:bg-slate-700 transition-colors">
-              Start Exam on {t}
+            <button key={t} onClick={() => onSelect(t)} className="w-full p-4 bg-white dark:bg-slate-800 rounded-lg shadow font-semibold text-lg interactive-card hover:bg-indigo-50 dark:hover:bg-slate-700 transition-colors btn-pressable">
+              {t}
             </button>
           ))}
         </div>
+        <button onClick={resetExam} className="mt-6 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
+            Back to Exam Type Selection
+        </button>
       </div>
-    );
-  }
-  
-  if (isFinished) {
-      return (
-          <div className="max-w-2xl mx-auto text-center bg-white dark:bg-slate-800 p-8 rounded-lg shadow-xl animate-fade-in">
-              <h2 className="text-3xl font-bold">🎉 Exam Complete! 🎉</h2>
-              <p className="text-xl mt-4">Your Score: <span className="font-bold text-indigo-600 dark:text-indigo-400">{score} / {questions.length}</span></p>
-              <button onClick={resetExam} className="mt-8 px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow hover:bg-indigo-700">
-                  Take Another Exam
-              </button>
-          </div>
-      )
-  }
+  );
 
-  if (questions.length === 0) {
-    return <div>No questions available.</div>;
-  }
+  const renderQuizMode = () => {
+    if (isLoading) {
+        return <div className="flex justify-center mt-10"><Spinner text="Preparing your quiz..." /></div>;
+    }
+
+    if (!topic) {
+        return renderTopicSelection(startQuiz);
+    }
   
-  const currentQuestion = questions[currentQuestionIndex];
+    if (isFinished) {
+        return (
+            <div className="max-w-2xl mx-auto text-center bg-white dark:bg-slate-800 p-8 rounded-lg shadow-xl animate-fade-in">
+                <h2 className="text-3xl font-bold">🎉 Quiz Complete! 🎉</h2>
+                <p className="text-xl mt-4">Your Score: <span className="font-bold text-indigo-600 dark:text-indigo-400">{score} / {questions.length}</span></p>
+                <button onClick={resetExam} className="mt-8 px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow hover:bg-indigo-700 btn-pressable">
+                    Back to Exam Mode
+                </button>
+            </div>
+        )
+    }
+
+    if (questions.length === 0) {
+        return <div>No questions available. Try another topic.</div>;
+    }
+  
+    const currentQuestion = questions[currentQuestionIndex];
+
+    return (
+        <div className="max-w-2xl mx-auto bg-white dark:bg-slate-800 p-8 rounded-lg shadow-xl animate-slide-in-up">
+            <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold">{topic} Quiz</h2>
+                <div className="text-sm font-semibold">Question {currentQuestionIndex + 1} of {questions.length}</div>
+            </div>
+            <ProgressBar value={currentQuestionIndex + 1} max={questions.length} />
+            <div className="mt-6">
+                <h3 className="text-lg font-semibold">{currentQuestion.questionText}</h3>
+                <div className="mt-4 space-y-3">
+                    {currentQuestion.options.map(option => {
+                    const isSelected = selectedAnswer === option;
+                    const isCorrect = option === currentQuestion.correctAnswer;
+                    let buttonClass = 'w-full text-left p-4 rounded-lg border-2 transition-colors btn-pressable ';
+                    if (selectedAnswer) {
+                        if (isCorrect) buttonClass += 'bg-green-100 dark:bg-green-900 border-green-500 animate-correct-pulse';
+                        else if (isSelected) buttonClass += 'bg-red-100 dark:bg-red-900 border-red-500 animate-shake';
+                        else buttonClass += 'bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600';
+                    } else {
+                        buttonClass += 'bg-slate-100 dark:bg-slate-700 hover:bg-indigo-100 dark:hover:bg-slate-600 border-slate-300 dark:border-slate-600';
+                    }
+
+                    return (
+                        <button key={option} onClick={() => handleAnswerSelect(option)} disabled={!!selectedAnswer} className={buttonClass}>
+                        {option}
+                        </button>
+                    );
+                    })}
+                </div>
+                {selectedAnswer && (
+                    <div className="mt-4 p-4 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                        <h4 className="font-bold">Explanation</h4>
+                        <p className="text-sm mt-1">{currentQuestion.explanation}</p>
+                    </div>
+                )}
+                <div className="mt-6 text-right">
+                    <button onClick={handleNextQuestion} disabled={!selectedAnswer} className="px-8 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow disabled:bg-slate-400 disabled:cursor-not-allowed hover:bg-indigo-700 btn-pressable">
+                    {currentQuestionIndex < questions.length - 1 ? 'Next Question' : 'Finish Quiz'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+  };
+
+  const renderWritingMode = () => {
+    if (isGeneratingPrompt) {
+        return <div className="flex justify-center mt-10"><Spinner text="Generating your writing prompt..." /></div>;
+    }
+
+    if (!topic) {
+        return renderTopicSelection(startWritingPractice);
+    }
+    
+    if (!writingPrompt) {
+        return <p className="text-center text-slate-500 mt-10">Could not load a prompt. Please go back and try another topic.</p>
+    }
+
+    return (
+        <div className="max-w-3xl mx-auto bg-white dark:bg-slate-800 p-8 rounded-lg shadow-xl animate-slide-in-up space-y-6">
+            <div>
+                <button onClick={resetExam} className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline mb-4">
+                    Back to Exam Mode
+                </button>
+                <h2 className="text-xl font-bold">Writing Practice: {topic}</h2>
+            </div>
+
+            <div className="p-4 bg-slate-100 dark:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600">
+                <h3 className="font-semibold text-slate-800 dark:text-slate-200">Your Prompt:</h3>
+                <p className="mt-2 text-lg italic">"{writingPrompt}"</p>
+            </div>
+            
+            <textarea
+                value={essayText}
+                onChange={(e) => setEssayText(e.target.value)}
+                placeholder="Start writing your essay here..."
+                className="w-full h-64 p-4 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all duration-200"
+                disabled={isGeneratingFeedback || !!feedback}
+            />
+
+            {!feedback && (
+                <div className="text-right">
+                    <button 
+                        onClick={handleSubmitEssay} 
+                        disabled={!essayText.trim() || isGeneratingFeedback}
+                        className="px-8 py-3 bg-teal-600 text-white font-semibold rounded-lg shadow disabled:bg-slate-400 disabled:cursor-not-allowed hover:bg-teal-700 btn-pressable"
+                    >
+                        {isGeneratingFeedback ? 'Analyzing...' : 'Submit for Feedback'}
+                    </button>
+                </div>
+            )}
+
+            {isGeneratingFeedback && <div className="flex justify-center"><Spinner text="Your AI teacher is reviewing your work..." /></div>}
+            
+            {feedback && (
+                <div className="mt-6 border-t border-slate-200 dark:border-slate-700 pt-6 animate-fade-in">
+                    <h3 className="text-2xl font-bold mb-4">Feedback from your AI Teacher</h3>
+                    <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                        <ContentRenderer content={feedback} />
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+  };
+
+  const renderContent = () => {
+    if (error) {
+        return <p className="text-center text-red-500 mt-10">{error}</p>;
+    }
+
+    switch (mode) {
+        case 'quiz':
+            return renderQuizMode();
+        case 'writing':
+            return renderWritingMode();
+        case 'selection':
+        default:
+            return renderSelectionScreen();
+    }
+  }
 
   return (
     <>
       {isTutorChatOpen && <TutorChat onClose={() => setIsTutorChatOpen(false)} />}
-      <div className="max-w-2xl mx-auto bg-white dark:bg-slate-800 p-8 rounded-lg shadow-xl animate-slide-in-up">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold">{topic} Exam</h2>
-          <div className="text-sm font-semibold">Question {currentQuestionIndex + 1} of {questions.length}</div>
-        </div>
-        <ProgressBar value={currentQuestionIndex + 1} max={questions.length} />
-        <div className="mt-6">
-          <h3 className="text-lg font-semibold">{currentQuestion.questionText}</h3>
-          <div className="mt-4 space-y-3">
-            {currentQuestion.options.map(option => {
-              const isSelected = selectedAnswer === option;
-              const isCorrect = option === currentQuestion.correctAnswer;
-              let buttonClass = 'w-full text-left p-4 rounded-lg border-2 transition-colors ';
-              if (selectedAnswer) {
-                  if (isCorrect) buttonClass += 'bg-green-100 dark:bg-green-900 border-green-500 ';
-                  else if (isSelected) buttonClass += 'bg-red-100 dark:bg-red-900 border-red-500 ';
-                  else buttonClass += 'bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600';
-              } else {
-                  buttonClass += 'bg-slate-100 dark:bg-slate-700 hover:bg-indigo-100 dark:hover:bg-slate-600 border-slate-300 dark:border-slate-600';
-              }
-
-              return (
-                <button
-                  key={option}
-                  onClick={() => handleAnswerSelect(option)}
-                  disabled={!!selectedAnswer}
-                  className={buttonClass}
-                >
-                  {option}
-                </button>
-              );
-            })}
-          </div>
-          {selectedAnswer && (
-              <div className="mt-4 p-4 bg-slate-100 dark:bg-slate-700 rounded-lg">
-                  <h4 className="font-bold">Explanation</h4>
-                  <p className="text-sm mt-1">{currentQuestion.explanation}</p>
-              </div>
-          )}
-          <div className="mt-6 text-right">
-            <button onClick={handleNextQuestion} disabled={!selectedAnswer} className="px-8 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow disabled:bg-slate-400 disabled:cursor-not-allowed hover:bg-indigo-700">
-              {currentQuestionIndex < questions.length - 1 ? 'Next Question' : 'Finish Exam'}
-            </button>
-          </div>
-        </div>
-      </div>
+      {renderContent()}
       
-      <button
-          onClick={() => setIsTutorChatOpen(true)}
-          className="fixed bottom-6 right-6 bg-indigo-600 text-white p-4 rounded-full shadow-lg hover:bg-indigo-700 transition-transform transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 z-40"
-          aria-label="Ask AI Tutor for help"
-      >
-          <MessageSquareHeart className="h-6 w-6" />
-      </button>
+      {mode !== 'selection' && (
+        <button
+            onClick={() => setIsTutorChatOpen(true)}
+            className="fixed bottom-6 right-6 bg-indigo-600 text-white p-4 rounded-full shadow-lg hover:bg-indigo-700 transition-transform transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 z-40"
+            aria-label="Ask AI Tutor for help"
+        >
+            <MessageSquareHeart className="h-6 w-6" />
+        </button>
+      )}
     </>
   );
 };

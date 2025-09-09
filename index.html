@@ -6,13 +6,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AlfaNumric</title>
     <script>
-      // This polyfill makes the API key available to the application
-      // in a way that mimics a Node.js environment variable, which the
-      // @google/genai SDK expects.
+      // This polyfill makes environment variables available to the application
+      // in a way that mimics a Node.js environment.
       if (!window.process) {
         window.process = {
           env: {
-            API_KEY: "AIzaSyDezSOh-MZmUSBwYcfWu50Tc0aEuwNxD_o"
+            // Your Google AI API Key
+            API_KEY: "AIzaSyDezSOh-MZmUSBwYcfWu50Tc0aEuwNxD_o",
+            // IMPORTANT: Replace with your Supabase Public Anon Key
+            SUPABASE_ANON_KEY: "REPLACE_WITH_YOUR_SUPABASE_ANON_KEY"
           }
         };
       }
@@ -42,14 +44,43 @@
       .animate-slide-in-up {
         animation: slide-in-up 0.5s cubic-bezier(0.215, 0.610, 0.355, 1.000) forwards;
       }
+
+      /* Animation for incorrect answers */
+      @keyframes shake {
+        10%, 90% { transform: translateX(-1px); }
+        20%, 80% { transform: translateX(2px); }
+        30%, 50%, 70% { transform: translateX(-4px); }
+        40%, 60% { transform: translateX(4px); }
+      }
+      .animate-shake {
+        animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+      }
+
+      /* Animation for correct answers */
+      @keyframes correct-pulse {
+        0% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.4); }
+        70% { box-shadow: 0 0 0 10px rgba(22, 163, 74, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
+      }
+      .animate-correct-pulse {
+        animation: correct-pulse 1s ease-in-out;
+      }
+      
+      /* Subtle press down effect for buttons */
+      .btn-pressable {
+        transition: transform 0.15s cubic-bezier(0.215, 0.610, 0.355, 1.000);
+      }
+      .btn-pressable:active {
+        transform: scale(0.97);
+      }
       
       /* Base transition for interactive cards */
       .interactive-card {
         transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
       }
       .interactive-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        transform: translateY(-5px); /* Slightly more lift */
+        box-shadow: 0 12px 20px -4px rgb(0 0 0 / 0.1), 0 5px 8px -5px rgb(0 0 0 / 0.1); /* Deeper shadow */
       }
 
       /* Learning Path Styles */
@@ -140,10 +171,7 @@
     "react/": "https://aistudiocdn.com/react@^19.1.1/",
     "react": "https://aistudiocdn.com/react@^19.1.1",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
-    "firebase/app": "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js",
-    "firebase/auth": "https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js",
-    "firebase/firestore": "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js",
-    "firebase/": "https://aistudiocdn.com/firebase@^12.2.1/",
+    "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm",
     "lucide-react": "https://aistudiocdn.com/lucide-react@^0.542.0"
   }
 }

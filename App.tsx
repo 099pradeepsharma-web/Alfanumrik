@@ -8,6 +8,7 @@ import DailyChallenge from './components/DailyChallenge';
 import Auth from './components/Auth';
 import TeacherDashboard from './components/TeacherDashboard';
 import ParentDashboard from './components/ParentDashboard';
+import ProfileSettings from './components/ProfileSettings';
 import Spinner from './components/Spinner';
 import * as authService from './services/authService';
 
@@ -91,6 +92,8 @@ const AppContent: React.FC = () => {
                 return <TeacherDashboard />;
             case 'parentDashboard':
                 return <ParentDashboard />;
+            case 'profileSettings':
+                return <ProfileSettings />;
             case 'dashboard':
             default:
                 if (currentUser.role === 'teacher') return <TeacherDashboard />;

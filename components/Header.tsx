@@ -3,13 +3,14 @@ import { useAppContext } from '../contexts/AppContext';
 import { useLocalization } from '../hooks/useLocalization';
 import type { Language, View } from '../types';
 import * as authService from '../services/authService';
+import { Settings } from 'lucide-react';
 
 const NavButton: React.FC<{ viewName: View; currentView: View; onClick: (view: View) => void; children: React.ReactNode }> = ({ viewName, currentView, onClick, children }) => {
   const isActive = viewName === currentView;
   return (
     <button 
       onClick={() => onClick(viewName)}
-      className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+      className={`px-4 py-2 text-sm font-medium rounded-md transition-colors btn-pressable ${
         isActive 
           ? 'bg-indigo-600 text-white' 
           : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
@@ -52,7 +53,7 @@ const Header: React.FC = () => {
           </h1>
           {currentUser && (
             <nav className="hidden md:flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
-                <button onClick={handleDashboardClick} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                <button onClick={handleDashboardClick} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors btn-pressable ${
                     ['dashboard', 'teacherDashboard', 'parentDashboard'].includes(view)
                     ? 'bg-indigo-600 text-white' 
                     : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
@@ -98,8 +99,17 @@ const Header: React.FC = () => {
             <option value="en">English</option>
             <option value="hi">हिन्दी</option>
           </select>
-          {currentUser && (
-             <button onClick={handleLogout} className="text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400">{t('logout')}</button>
+           {currentUser && (
+             <>
+              <button
+                onClick={() => setView('profileSettings')}
+                className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full btn-pressable"
+                aria-label="Profile Settings"
+              >
+                <Settings className="h-5 w-5" />
+              </button>
+              <button onClick={handleLogout} className="text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 btn-pressable">{t('logout')}</button>
+            </>
           )}
         </div>
       </div>

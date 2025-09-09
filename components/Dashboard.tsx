@@ -85,7 +85,7 @@ const Dashboard: React.FC = () => {
                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 mb-4">Get instant help from our AI Tutor.</p>
                 <button 
                   onClick={() => setIsTutorChatOpen(true)}
-                  className="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  className="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 btn-pressable"
                 >
                     Talk to a Tutor
                 </button>
